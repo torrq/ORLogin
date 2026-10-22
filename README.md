@@ -6,7 +6,7 @@ A secure, high-performance login helper for **Oldschool Ragnarok Online (OSRO)**
 
 ## Features
 
-- **LastPass-Style Encrypted Vault**:
+- **Encrypted Local Vault**:
   - Saved accounts and passwords are encrypted with **AES-256-GCM** using keys derived via **PBKDF2-HMAC-SHA256** (600,000 iterations via Windows CNG `bcrypt.dll`) with cryptographic random salt and per-save nonces.
   - Zero plaintext on disk. The vault file (`ORLogin.vault`) is atomically replaced upon save with automated `.bak` backups.
 - **In-Memory Hardening**:

@@ -72,35 +72,30 @@ bool RenderLockIconButton(const AppThemeColors& c) {
     ImU32 iconCol = ImGui::ColorConvertFloat4ToU32(hovered ? c.accent : c.text);
     ImU32 bgCol   = ImGui::ColorConvertFloat4ToU32(hovered ? c.panelHover : c.panel);
 
-    // Padlock dimensions
-    float bodyW = 14.0f;
-    float bodyH = 10.0f;
-    float bodyMinY = center.y - 1.0f;
+    // Padlock dimensions (perfectly centered, generous top/bottom margin)
+    float bodyW = 12.0f;
+    float bodyH = 9.0f;
+    float bodyMinY = center.y - 0.5f;
     float bodyMaxY = bodyMinY + bodyH;
 
-    // 1. Shackle (inverted U-arch with vertical legs extending into the body)
-    float shackleR = 4.2f;
-    float shackleArchCenterY = bodyMinY - 2.5f;
+    // 1. Shackle (inverted U-arch curving UPWARDS, legs extending into body)
+    float shackleR = 3.6f;
+    float shackleArchCenterY = bodyMinY - 1.8f;
     draw->PathLineTo(ImVec2(center.x - shackleR, bodyMinY + 2.0f));
     draw->PathLineTo(ImVec2(center.x - shackleR, shackleArchCenterY));
-    draw->PathArcTo(ImVec2(center.x, shackleArchCenterY), shackleR, 3.14159265f, 0.0f, 16);
-    draw->PathLineTo(ImVec2(center.x + shackleR, shackleArchCenterY));
+    draw->PathArcTo(ImVec2(center.x, shackleArchCenterY), shackleR, 3.14159265f, 6.28318531f, 16);
     draw->PathLineTo(ImVec2(center.x + shackleR, bodyMinY + 2.0f));
-    draw->PathStroke(iconCol, 0, 2.0f);
+    draw->PathStroke(iconCol, 0, 1.8f);
 
     // 2. Padlock body (rounded solid rectangle overlapping the shackle leg bases)
     ImVec2 bodyMin(center.x - bodyW * 0.5f, bodyMinY);
     ImVec2 bodyMax(center.x + bodyW * 0.5f, bodyMaxY);
     draw->AddRectFilled(bodyMin, bodyMax, iconCol, 2.0f);
 
-    // 3. Keyhole cutout (circle + trapezoid slit in background color)
-    float keyholeY = bodyMinY + 3.8f;
-    draw->AddCircleFilled(ImVec2(center.x, keyholeY), 1.5f, bgCol);
-    ImVec2 p1(center.x - 1.1f, keyholeY);
-    ImVec2 p2(center.x + 1.1f, keyholeY);
-    ImVec2 p3(center.x + 0.6f, bodyMinY + 7.5f);
-    ImVec2 p4(center.x - 0.6f, bodyMinY + 7.5f);
-    draw->AddQuadFilled(p1, p2, p3, p4, bgCol);
+    // 3. Keyhole cutout (circle + slot in background color)
+    float keyholeY = bodyMinY + 3.5f;
+    draw->AddCircleFilled(ImVec2(center.x, keyholeY), 1.3f, bgCol);
+    draw->AddLine(ImVec2(center.x, keyholeY), ImVec2(center.x, bodyMinY + 6.8f), bgCol, 1.4f);
 
     return clicked;
 }
@@ -134,32 +129,22 @@ bool RenderThemeIconButton(bool darkTheme, const AppThemeColors& c) {
     ImVec2 neckP3(center.x + 2.0f, center.y + 3.6f);
     ImVec2 neckP4(center.x - 2.0f, center.y + 3.6f);
 
+    // Bulb fill: bright warm golden yellow in light theme, darker unlit slate in dark theme
+    ImU32 bulbCol = !darkTheme
+        ? (ImU32)ImColor(255, 215, 60, hovered ? 255 : 220)
+        : (ImU32)(hovered ? ImColor(115, 125, 145, 255) : ImColor(70, 78, 94, 255));
+
+    draw->AddCircleFilled(domeC, domeR, bulbCol);
+    draw->AddQuadFilled(neckP1, neckP2, neckP3, neckP4, bulbCol);
+
     if (!darkTheme) {
-        // Light theme: bulb is ON (bright warm golden yellow + radiant rays)
-        ImU32 bulbCol = ImColor(255, 215, 60, hovered ? 255 : 220);
-        ImU32 rayCol  = ImColor(255, 195, 30, 255);
-
-        draw->AddCircleFilled(domeC, domeR, bulbCol);
-        draw->AddQuadFilled(neckP1, neckP2, neckP3, neckP4, bulbCol);
-
-        // Radiant rays
-        draw->AddLine(ImVec2(center.x, center.y - 8.5f), ImVec2(center.x, center.y - 11.0f), rayCol, 1.6f);
-        draw->AddLine(ImVec2(center.x - 5.5f, center.y - 6.5f), ImVec2(center.x - 7.5f, center.y - 8.5f), rayCol, 1.6f);
-        draw->AddLine(ImVec2(center.x + 5.5f, center.y - 6.5f), ImVec2(center.x + 7.5f, center.y - 8.5f), rayCol, 1.6f);
-        draw->AddLine(ImVec2(center.x - 6.5f, center.y - 2.5f), ImVec2(center.x - 9.0f, center.y - 2.5f), rayCol, 1.6f);
-        draw->AddLine(ImVec2(center.x + 6.5f, center.y - 2.5f), ImVec2(center.x + 9.0f, center.y - 2.5f), rayCol, 1.6f);
-    } else {
-        // Dark theme: bulb is OFF (dark dim slate glass with crisp outline, no rays)
-        ImU32 darkFill = hovered ? ImColor(95, 105, 125, 230) : ImColor(60, 66, 80, 220);
-
-        draw->AddCircleFilled(domeC, domeR, darkFill);
-        draw->AddQuadFilled(neckP1, neckP2, neckP3, neckP4, darkFill);
-
-        // Clean outer glass contour
-        draw->PathArcTo(domeC, domeR, 2.55f, 0.59f, 16);
-        draw->PathLineTo(ImVec2(center.x + 2.0f, center.y + 3.6f));
-        draw->PathLineTo(ImVec2(center.x - 2.0f, center.y + 3.6f));
-        draw->PathStroke(iconCol, ImDrawFlags_Closed, 1.4f);
+        // Light theme: radiant rays
+        ImU32 rayCol = ImColor(255, 195, 30, 255);
+        draw->AddLine(ImVec2(center.x, center.y - 8.5f), ImVec2(center.x, center.y - 11.0f), rayCol, 1.5f);
+        draw->AddLine(ImVec2(center.x - 5.5f, center.y - 6.5f), ImVec2(center.x - 7.5f, center.y - 8.5f), rayCol, 1.5f);
+        draw->AddLine(ImVec2(center.x + 5.5f, center.y - 6.5f), ImVec2(center.x + 7.5f, center.y - 8.5f), rayCol, 1.5f);
+        draw->AddLine(ImVec2(center.x - 6.5f, center.y - 2.5f), ImVec2(center.x - 9.0f, center.y - 2.5f), rayCol, 1.5f);
+        draw->AddLine(ImVec2(center.x + 6.5f, center.y - 2.5f), ImVec2(center.x + 9.0f, center.y - 2.5f), rayCol, 1.5f);
     }
 
     // Screw base (identical on both)
@@ -427,6 +412,8 @@ void App::RenderHeader() {
     ImGui::AlignTextToFramePadding();
     ImGui::TextColored(c.accent, "OSRO Login Helper");
     ImGui::SameLine();
+    ImGui::TextColored(c.muted, kVersion);
+    ImGui::SameLine();
 
     // Server badge
     ImGui::PushStyleColor(ImGuiCol_Button, c.panel);
@@ -610,14 +597,14 @@ void App::RenderMainScreen() {
     float footerReserve = 34.0f;
     float contentH = ImGui::GetContentRegionAvail().y - footerReserve;
 
-    float bottomH  = 140.0f;
+    float bottomH  = 145.0f;
     float accountsH = std::max(180.0f, contentH - bottomH - ImGui::GetStyle().ItemSpacing.y);
 
     ImGui::BeginChild("AccountsSection", ImVec2(0, accountsH), true);
     RenderAccountsPanel();
     ImGui::EndChild();
 
-    float clientsW = 320.0f;
+    float clientsW = 340.0f;
 
     ImGui::BeginChild("ClientsSection", ImVec2(clientsW, bottomH), true);
     RenderClientsPanel();
@@ -731,8 +718,6 @@ void App::RenderClientsPanel() {
     AppThemeColors c = Theme::GetThemeColors(m_settings.darkTheme);
     const auto& clients = m_monitor.Clients();
 
-    if (m_smallFont) ImGui::PushFont(m_smallFont);
-
     ImGui::AlignTextToFramePadding();
     ImGui::TextColored(c.accent, "Running Clients (%zu)", clients.size());
     ImGui::SameLine();
@@ -744,7 +729,6 @@ void App::RenderClientsPanel() {
 
     if (clients.empty()) {
         ImGui::TextColored(c.muted, "No OSRO client processes detected.");
-        if (m_smallFont) ImGui::PopFont();
         return;
     }
 
@@ -776,8 +760,6 @@ void App::RenderClientsPanel() {
         ImGui::SameLine();
         ImGui::TextColored(dotColor, "%s", status.c_str());
     }
-
-    if (m_smallFont) ImGui::PopFont();
 }
 
 void App::RenderSettingsPanel() {
@@ -785,18 +767,8 @@ void App::RenderSettingsPanel() {
 
     ImGui::AlignTextToFramePadding();
     ImGui::TextColored(c.accent, "Settings");
-    ImGui::SameLine();
-
-    float advW = ImGui::CalcTextSize("Advanced...").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-    float avail = ImGui::GetContentRegionAvail().x;
-    if (avail > advW) ImGui::SameLine(ImGui::GetCursorPosX() + avail - advW);
-    else              ImGui::SameLine();
-
-    if (ImGui::Button("Advanced...")) {
-        m_advancedSettingsOpen = true;
-    }
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Configure keystroke injection method, sequence, safety checks & delays");
     ImGui::Separator();
+    ImGui::Spacing();
 
     if (ImGui::BeginTable("SettingsLayoutGrid", 2, ImGuiTableFlags_None)) {
         ImGui::TableSetupColumn("ColLeft",  ImGuiTableColumnFlags_WidthStretch, 0.54f);
@@ -805,8 +777,24 @@ void App::RenderSettingsPanel() {
         // ── Row 1 ──
         ImGui::TableNextRow();
 
-        // Left: Login Hotkey
+        // Left: [x] Auto-lock vault   [  5 min ]
         ImGui::TableSetColumnIndex(0);
+        ImGui::AlignTextToFramePadding();
+        bool autoLockEnabled = (m_settings.autoLockMinutes > 0);
+        if (ImGui::Checkbox("Auto-lock vault", &autoLockEnabled)) {
+            m_settings.autoLockMinutes = autoLockEnabled ? 15 : 0;
+            SaveSettings();
+        }
+        if (autoLockEnabled) {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(75.0f);
+            if (ImGui::SliderInt("##auto_lock_val", &m_settings.autoLockMinutes, 1, 60, "%d min")) {
+                SaveSettings();
+            }
+        }
+
+        // Right: Login Hotkey:  [ F9 ]
+        ImGui::TableSetColumnIndex(1);
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Login Hotkey:");
         ImGui::SameLine();
@@ -822,35 +810,25 @@ void App::RenderSettingsPanel() {
             ImGui::TextColored(c.red, "(conflict)");
         }
 
-        // Right: Hide from screen capture
-        ImGui::TableSetColumnIndex(1);
+        // ── Row 2 ──
+        ImGui::TableNextRow();
+
+        // Left: [ ] Hide from screen capture
+        ImGui::TableSetColumnIndex(0);
         ImGui::AlignTextToFramePadding();
         if (ImGui::Checkbox("Hide from screen capture", &m_settings.hideFromCapture)) {
             ApplySettingsToSystem();
             SaveSettings();
         }
 
-        // ── Row 2 ──
-        ImGui::TableNextRow();
-
-        // Left: Auto-lock vault
-        ImGui::TableSetColumnIndex(0);
+        // Right: [ Advanced... ]
+        ImGui::TableSetColumnIndex(1);
         ImGui::AlignTextToFramePadding();
-        bool autoLockEnabled = (m_settings.autoLockMinutes > 0);
-        if (ImGui::Checkbox("Auto-lock vault", &autoLockEnabled)) {
-            if (autoLockEnabled) {
-                m_settings.autoLockMinutes = 15;
-            } else {
-                m_settings.autoLockMinutes = 0;
-            }
-            SaveSettings();
+        if (ImGui::Button("Advanced...")) {
+            m_advancedSettingsOpen = true;
         }
-        if (autoLockEnabled) {
-            ImGui::SameLine();
-            ImGui::SetNextItemWidth(85.0f);
-            if (ImGui::SliderInt("##auto_lock_val", &m_settings.autoLockMinutes, 1, 60, "%d min")) {
-                SaveSettings();
-            }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Configure keystroke injection method, sequence, safety checks & delays");
         }
 
         ImGui::EndTable();

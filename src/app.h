@@ -28,7 +28,8 @@ public:
     void OnSessionLock();
     bool HandleCloseRequest(HWND hwnd);
 
-    const char* GetWindowTitle() const { return "OSRO Login Helper"; }
+    static constexpr const char* kVersion = "v0.3";
+    const char* GetWindowTitle() const { return "OSRO Login Helper v0.3"; }
     bool IsDarkTheme() const { return m_settings.darkTheme; }
     void SetSmallFont(ImFont* f) { m_smallFont = f; }
 
