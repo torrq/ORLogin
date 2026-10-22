@@ -199,27 +199,19 @@ void Typer::Run(TyperJob job, std::atomic<bool>* busyFlag) {
     TypeBytes(job.hwnd, job.method, job.password.data(), job.password.size(), delay);
 
     if (job.pressEnter) {
-        // Ensure game window is in foreground so dialogs and hardware input are active
+        // Bring game window to foreground so dialogs and hardware input are active
         if (job.hwnd && IsWindow(job.hwnd)) {
             SetForegroundWindow(job.hwnd);
         }
 
-        // First Return submits username and password
-        Sleep(std::max(delay, 20));
-        TapKey(job.hwnd, job.method, VK_RETURN, 20, hold);
-
-        // Pause for the 'Select Service' prompt to appear across the network (default 350ms)
-        int pauseMs = std::max(std::clamp(job.enterDelayMs, 20, 1000), 350);
-        Sleep(pauseMs);
-
-        // Open client process handle to check when Character Select is reached (UiFlag == 1 at 0x00F33F90)
+        // Open client process handle to check Character Select memory state
         HANDLE hProcess = nullptr;
         if (job.targetPid != 0) {
-            hProcess = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, job.targetPid);
+            hProcess = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, FALSE, job.targetPid);
             if (!hProcess) hProcess = OpenProcess(PROCESS_VM_READ, FALSE, job.targetPid);
         }
 
-        auto HasReachedCharSelect = [hProcess]() -> bool {
+        auto IsAtCharSelect = [hProcess]() -> bool {
             if (!hProcess) return false;
             uint32_t uiFlag = 0;
             SIZE_T read = 0;
@@ -229,43 +221,40 @@ void Typer::Run(TyperJob job, std::atomic<bool>* busyFlag) {
             return false;
         };
 
-        // If client somehow reached Character Select already, do not send Return
-        if (!HasReachedCharSelect()) {
-            const int maxAttempts = (hProcess != nullptr) ? 3 : 1;
-            // Allow 600ms between attempts: Char Server connection takes ~250-400ms.
-            // 600ms gives ample time for UiFlag to flip to 1 before another attempt can fire,
-            // strictly guaranteeing that we never send an extra Return into Character Select.
-            const int pollWindowMs = 600;
+        // First Return submits username and password on the login screen
+        Sleep(std::max(delay, 20));
+        TapKey(job.hwnd, job.method, VK_RETURN, 20, hold);
 
-            for (int attempt = 0; attempt < maxAttempts; ++attempt) {
-                if (!IsWindow(job.hwnd)) break;
-
-                // Bring to foreground if focus shifted
-                if (GetForegroundWindow() != job.hwnd) {
-                    SetForegroundWindow(job.hwnd);
-                }
-
-                // Send exactly ONE hardware Return to confirm 'Select Service'
-                if (GetForegroundWindow() == job.hwnd || job.method == InputMethod::SendInput) {
-                    SendInputKeyTap(VK_RETURN, hold);
-                } else {
-                    PostKeyTap(job.hwnd, VK_RETURN, hold);
-                }
-
-                // Poll UiFlag every 25ms over the 600ms window
-                bool reached = false;
-                for (int elapsed = 0; elapsed < pollWindowMs; elapsed += 25) {
-                    Sleep(25);
-                    if (HasReachedCharSelect()) {
-                        reached = true;
-                        break;
-                    }
-                }
-                // The instant Character Select is confirmed, STOP! Never send another Return.
-                if (reached) break;
-            }
+        // If client is already at Character Select, stop immediately!
+        if (IsAtCharSelect()) {
+            if (hProcess) CloseHandle(hProcess);
+            return;
         }
 
+        // Configured pause for the 'Select Service' prompt to appear across the network (default 300 ms)
+        int pauseMs = std::clamp(job.enterDelayMs, 50, 1000);
+        Sleep(pauseMs);
+
+        // If client reached Character Select during the pause, stop immediately!
+        if (IsAtCharSelect()) {
+            if (hProcess) CloseHandle(hProcess);
+            return;
+        }
+
+        // Second Return confirms 'Select Service' prompt.
+        // Send exactly ONE Return. If the game client is in foreground, use hardware
+        // SendInputKeyTap so GetAsyncKeyState and DirectInput state tables update identically
+        // to a physical key press.
+        if (GetForegroundWindow() != job.hwnd) {
+            SetForegroundWindow(job.hwnd);
+        }
+        if (GetForegroundWindow() == job.hwnd || job.method == InputMethod::SendInput) {
+            SendInputKeyTap(VK_RETURN, hold);
+        } else {
+            PostKeyTap(job.hwnd, VK_RETURN, hold);
+        }
+
+        // Stop: Exactly two Returns sent. Never send a third Return so we stop at Character Select.
         if (hProcess) CloseHandle(hProcess);
     }
 }

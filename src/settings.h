@@ -25,7 +25,7 @@ struct Settings {
     bool          pressEnter         = true;
     InputMethod   inputMethod        = InputMethod::PostMessage;
     int           keyDelayMs         = 15;
-    int           enterDelayMs       = 350;  // pause between 1st Return and 2nd Return (ms)
+    int           enterDelayMs       = 300;  // pause between 1st Return and 2nd Return (ms)
     int           tabDelayMs         = 25;   // pause after Tab key focus transition (ms)
     int           clearDelayMs       = 3;    // delay between backspaces when clearing ID field (ms)
     int           keyHoldMs          = 10;   // key down hold duration before release (ms)
