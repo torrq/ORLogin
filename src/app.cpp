@@ -423,11 +423,12 @@ void App::RenderHeader() {
     ImGui::SmallButton(m_monitor.Profile().label);
     ImGui::PopStyleColor(4);
 
-    // Right-aligned controls: [Master Password] [Lock Icon] [Theme Icon]
+    // Right-aligned controls: [Advanced...] [Master Password] [Lock Icon] [Theme Icon]
     float rightWidth = 34.0f; // Theme icon button width
     if (m_vault.IsUnlocked()) {
         rightWidth += 34.0f + ImGui::GetStyle().ItemSpacing.x; // Lock icon button width
         rightWidth += ImGui::CalcTextSize("Master Password").x + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetStyle().ItemSpacing.x;
+        rightWidth += ImGui::CalcTextSize("Advanced...").x + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetStyle().ItemSpacing.x;
     }
 
     float avail = ImGui::GetContentRegionAvail().x;
@@ -435,6 +436,14 @@ void App::RenderHeader() {
     else                    ImGui::SameLine();
 
     if (m_vault.IsUnlocked()) {
+        if (ImGui::Button("Advanced...")) {
+            m_advancedSettingsOpen = true;
+            ImGui::OpenPopup("Advanced Settings");
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Configure keystroke injection method, sequence, safety checks & delays");
+        }
+        ImGui::SameLine();
         if (ImGui::Button("Master Password")) {
             WipeFormBuffers();
             m_changeMasterOpen = true;
@@ -608,7 +617,7 @@ void App::RenderMainScreen() {
     float footerReserve = 34.0f;
     float contentH = ImGui::GetContentRegionAvail().y - footerReserve;
 
-    float bottomH  = 165.0f;
+    float bottomH  = 115.0f;
     float accountsH = std::max(180.0f, contentH - bottomH - ImGui::GetStyle().ItemSpacing.y);
 
     ImGui::BeginChild("AccountsSection", ImVec2(0, accountsH), true);
@@ -786,95 +795,27 @@ void App::RenderSettingsPanel() {
     ImGui::Separator();
     ImGui::Spacing();
 
-    if (ImGui::BeginTable("SettingsLayoutGrid", 2, ImGuiTableFlags_None)) {
-        ImGui::TableSetupColumn("ColLeft",  ImGuiTableColumnFlags_WidthStretch, 0.54f);
-        ImGui::TableSetupColumn("ColRight", ImGuiTableColumnFlags_WidthStretch, 0.46f);
-
-        // ── Row 1 ──
-        ImGui::TableNextRow();
-
-        // Left: [x] Auto-lock vault   [  5 min ]
-        ImGui::TableSetColumnIndex(0);
-        ImGui::AlignTextToFramePadding();
-        bool autoLockEnabled = (m_settings.autoLockMinutes > 0);
-        if (ImGui::Checkbox("Auto-lock vault", &autoLockEnabled)) {
-            m_settings.autoLockMinutes = autoLockEnabled ? 15 : 0;
-            SaveSettings();
-        }
-        if (autoLockEnabled) {
-            ImGui::SameLine();
-            ImGui::SetNextItemWidth(75.0f);
-            if (ImGui::SliderInt("##auto_lock_val", &m_settings.autoLockMinutes, 1, 60, "%d min")) {
-                SaveSettings();
-            }
-        }
-
-        // Right: Login Hotkey:  [ F9 ]
-        ImGui::TableSetColumnIndex(1);
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text("Login Hotkey:");
+    // Exactly 2 settings on a single clean line:
+    // [x] Auto-lock vault [ 5 min ]        [ ] Hide from screen capture
+    ImGui::AlignTextToFramePadding();
+    bool autoLockEnabled = (m_settings.autoLockMinutes > 0);
+    if (ImGui::Checkbox("Auto-lock vault", &autoLockEnabled)) {
+        m_settings.autoLockMinutes = autoLockEnabled ? 15 : 0;
+        SaveSettings();
+    }
+    if (autoLockEnabled) {
         ImGui::SameLine();
-        std::string hkLabel = m_capturingHotkey
-            ? "Press keys... (Esc)"
-            : Hotkey::Format(m_settings.hotkeyMods, m_settings.hotkeyVk);
-        if (ImGui::Button(hkLabel.c_str())) {
-            m_capturingHotkey = true;
-            Hotkey::Unregister(m_hwnd);
-        }
-        if (!m_hotkeyRegistered && !m_capturingHotkey) {
-            ImGui::SameLine();
-            ImGui::TextColored(c.red, "(conflict)");
-        }
-
-        // ── Row 2 ──
-        ImGui::TableNextRow();
-
-        // Left: [ ] Hide from screen capture
-        ImGui::TableSetColumnIndex(0);
-        ImGui::AlignTextToFramePadding();
-        if (ImGui::Checkbox("Hide from screen capture", &m_settings.hideFromCapture)) {
-            ApplySettingsToSystem();
+        ImGui::SetNextItemWidth(75.0f);
+        if (ImGui::SliderInt("##auto_lock_val", &m_settings.autoLockMinutes, 1, 60, "%d min")) {
             SaveSettings();
         }
-
-        // Right: [ Advanced... ]
-        ImGui::TableSetColumnIndex(1);
-        ImGui::AlignTextToFramePadding();
-        if (ImGui::Button("Advanced...")) {
-            m_advancedSettingsOpen = true;
-        }
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Configure keystroke injection method, sequence, safety checks & delays");
-        }
-
-        ImGui::EndTable();
     }
 
-    if (m_capturingHotkey) {
-        if (GetAsyncKeyState(VK_ESCAPE) & 0x8000) {
-            m_capturingHotkey  = false;
-            m_hotkeyRegistered = Hotkey::Register(m_hwnd, m_settings.hotkeyMods, m_settings.hotkeyVk);
-        } else {
-            UINT mods = 0;
-            if (GetAsyncKeyState(VK_CONTROL) & 0x8000) mods |= MOD_CONTROL;
-            if (GetAsyncKeyState(VK_SHIFT)   & 0x8000) mods |= MOD_SHIFT;
-            if (GetAsyncKeyState(VK_MENU)    & 0x8000) mods |= MOD_ALT;
-            if ((GetAsyncKeyState(VK_LWIN) | GetAsyncKeyState(VK_RWIN)) & 0x8000) mods |= MOD_WIN;
+    ImGui::SameLine(0, 24.0f);
 
-            for (UINT vk = 0x08; vk <= 0xFE; ++vk) {
-                if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON ||
-                    vk == VK_XBUTTON1 || vk == VK_XBUTTON2 || vk == VK_ESCAPE ||
-                    Hotkey::IsModifierKey(vk)) continue;
-                if (GetAsyncKeyState((int)vk) & 0x8000) {
-                    m_settings.hotkeyMods = mods;
-                    m_settings.hotkeyVk   = vk;
-                    m_capturingHotkey     = false;
-                    m_hotkeyRegistered    = Hotkey::Register(m_hwnd, m_settings.hotkeyMods, m_settings.hotkeyVk);
-                    SaveSettings();
-                    break;
-                }
-            }
-        }
+    if (ImGui::Checkbox("Hide from screen capture", &m_settings.hideFromCapture)) {
+        ApplySettingsToSystem();
+        SaveSettings();
     }
 
     if (m_panelFont) ImGui::PopFont();
@@ -1180,11 +1121,60 @@ void App::RenderStatusBar() {
 
     ImGui::Separator();
 
+    ImGui::AlignTextToFramePadding();
     if (!m_status.text.empty() && ImGui::GetTime() < m_status.expiryTime) {
         ImGui::TextColored(m_status.color, "%s", m_status.text.c_str());
+        ImGui::SameLine();
+        ImGui::TextColored(c.muted, "|");
+        ImGui::SameLine();
     } else {
-        ImGui::TextColored(c.muted, "Vault: %s  |  Hotkey: %s",
-                           m_vault.IsUnlocked() ? "Unlocked (AES-256-GCM)" : "Locked",
-                           Hotkey::Format(m_settings.hotkeyMods, m_settings.hotkeyVk).c_str());
+        ImGui::TextColored(c.muted, "Vault: %s  |",
+                           m_vault.IsUnlocked() ? "Unlocked (AES-256-GCM)" : "Locked");
+        ImGui::SameLine();
+    }
+
+    ImGui::TextColored(c.muted, "Hotkey:");
+    ImGui::SameLine();
+
+    std::string hkLabel = m_capturingHotkey
+        ? "Press keys... (Esc)"
+        : Hotkey::Format(m_settings.hotkeyMods, m_settings.hotkeyVk);
+    if (ImGui::SmallButton(hkLabel.c_str())) {
+        m_capturingHotkey = true;
+        Hotkey::Unregister(m_hwnd);
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Click to rebind login hotkey");
+    }
+    if (!m_hotkeyRegistered && !m_capturingHotkey) {
+        ImGui::SameLine();
+        ImGui::TextColored(c.red, "(conflict)");
+    }
+
+    if (m_capturingHotkey) {
+        if (GetAsyncKeyState(VK_ESCAPE) & 0x8000) {
+            m_capturingHotkey  = false;
+            m_hotkeyRegistered = Hotkey::Register(m_hwnd, m_settings.hotkeyMods, m_settings.hotkeyVk);
+        } else {
+            UINT mods = 0;
+            if (GetAsyncKeyState(VK_CONTROL) & 0x8000) mods |= MOD_CONTROL;
+            if (GetAsyncKeyState(VK_SHIFT)   & 0x8000) mods |= MOD_SHIFT;
+            if (GetAsyncKeyState(VK_MENU)    & 0x8000) mods |= MOD_ALT;
+            if ((GetAsyncKeyState(VK_LWIN) | GetAsyncKeyState(VK_RWIN)) & 0x8000) mods |= MOD_WIN;
+
+            for (UINT vk = 0x08; vk <= 0xFE; ++vk) {
+                if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON ||
+                    vk == VK_XBUTTON1 || vk == VK_XBUTTON2 || vk == VK_ESCAPE ||
+                    Hotkey::IsModifierKey(vk)) continue;
+                if (GetAsyncKeyState((int)vk) & 0x8000) {
+                    m_settings.hotkeyMods = mods;
+                    m_settings.hotkeyVk   = vk;
+                    m_capturingHotkey     = false;
+                    m_hotkeyRegistered    = Hotkey::Register(m_hwnd, m_settings.hotkeyMods, m_settings.hotkeyVk);
+                    SaveSettings();
+                    break;
+                }
+            }
+        }
     }
 }
