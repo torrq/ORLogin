@@ -459,10 +459,16 @@ void App::RenderHeader() {
 void App::RenderCreateVaultScreen() {
     AppThemeColors c = Theme::GetThemeColors(m_settings.darkTheme);
 
-    float panelW = std::min(500.0f, ImGui::GetContentRegionAvail().x);
-    ImGui::SetCursorPosX((ImGui::GetWindowWidth() - panelW) * 0.5f);
+    float panelW  = std::min(500.0f, ImGui::GetContentRegionAvail().x);
+    float panelH  = 340.0f;
+    float startY  = ImGui::GetCursorPosY();
+    float availH  = ImGui::GetContentRegionAvail().y - 40.0f;
+    float targetY = startY + (availH - panelH) * 0.5f;
 
-    ImGui::BeginChild("CreateVaultCard", ImVec2(panelW, 340.0f), true);
+    ImGui::SetCursorPosX((ImGui::GetWindowWidth() - panelW) * 0.5f);
+    if (targetY > startY) ImGui::SetCursorPosY(targetY);
+
+    ImGui::BeginChild("CreateVaultCard", ImVec2(panelW, panelH), true);
     ImGui::TextColored(c.accent, "Create Encrypted Vault");
     ImGui::TextWrapped("Accounts and passwords are encrypted with AES-256-GCM using a key derived from your master password (PBKDF2-HMAC-SHA256, 600,000 iterations).");
     ImGui::Spacing();
@@ -513,11 +519,16 @@ void App::RenderCreateVaultScreen() {
 void App::RenderUnlockScreen() {
     AppThemeColors c = Theme::GetThemeColors(m_settings.darkTheme);
 
-    float panelW = std::min(460.0f, ImGui::GetContentRegionAvail().x);
-    ImGui::SetCursorPosX((ImGui::GetWindowWidth() - panelW) * 0.5f);
-    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 24.0f);
+    float panelW  = std::min(460.0f, ImGui::GetContentRegionAvail().x);
+    float panelH  = 230.0f;
+    float startY  = ImGui::GetCursorPosY();
+    float availH  = ImGui::GetContentRegionAvail().y - 40.0f;
+    float targetY = startY + (availH - panelH) * 0.5f;
 
-    ImGui::BeginChild("UnlockVaultCard", ImVec2(panelW, 230.0f), true);
+    ImGui::SetCursorPosX((ImGui::GetWindowWidth() - panelW) * 0.5f);
+    if (targetY > startY) ImGui::SetCursorPosY(targetY);
+
+    ImGui::BeginChild("UnlockVaultCard", ImVec2(panelW, panelH), true);
     ImGui::TextColored(c.accent, "Vault Locked");
     ImGui::TextColored(c.muted, "Enter your master password to decrypt saved accounts.");
     ImGui::Spacing();
@@ -597,7 +608,7 @@ void App::RenderMainScreen() {
     float footerReserve = 34.0f;
     float contentH = ImGui::GetContentRegionAvail().y - footerReserve;
 
-    float bottomH  = 145.0f;
+    float bottomH  = 130.0f;
     float accountsH = std::max(180.0f, contentH - bottomH - ImGui::GetStyle().ItemSpacing.y);
 
     ImGui::BeginChild("AccountsSection", ImVec2(0, accountsH), true);
@@ -612,7 +623,7 @@ void App::RenderMainScreen() {
 
     ImGui::SameLine();
 
-    ImGui::BeginChild("SettingsSection", ImVec2(0, bottomH), true);
+    ImGui::BeginChild("SettingsSection", ImVec2(0, bottomH), true, ImGuiWindowFlags_NoScrollbar);
     RenderSettingsPanel();
     ImGui::EndChild();
 
@@ -715,6 +726,7 @@ void App::RenderAccountsPanel() {
 }
 
 void App::RenderClientsPanel() {
+    if (m_panelFont) ImGui::PushFont(m_panelFont);
     AppThemeColors c = Theme::GetThemeColors(m_settings.darkTheme);
     const auto& clients = m_monitor.Clients();
 
@@ -729,6 +741,7 @@ void App::RenderClientsPanel() {
 
     if (clients.empty()) {
         ImGui::TextColored(c.muted, "No OSRO client processes detected.");
+        if (m_panelFont) ImGui::PopFont();
         return;
     }
 
@@ -760,9 +773,12 @@ void App::RenderClientsPanel() {
         ImGui::SameLine();
         ImGui::TextColored(dotColor, "%s", status.c_str());
     }
+
+    if (m_panelFont) ImGui::PopFont();
 }
 
 void App::RenderSettingsPanel() {
+    if (m_panelFont) ImGui::PushFont(m_panelFont);
     AppThemeColors c = Theme::GetThemeColors(m_settings.darkTheme);
 
     ImGui::AlignTextToFramePadding();
@@ -860,6 +876,8 @@ void App::RenderSettingsPanel() {
             }
         }
     }
+
+    if (m_panelFont) ImGui::PopFont();
 }
 
 void App::RenderAccountModal() {

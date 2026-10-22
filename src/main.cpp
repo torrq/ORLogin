@@ -141,7 +141,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     fontCfg.PixelSnapH  = true;
 
     ImFont* loadedFont = nullptr;
-    ImFont* smallFont  = nullptr;
+    ImFont* panelFont   = nullptr;
     const char* fontCandidates[] = {
         "C:\\Windows\\Fonts\\segoeui.ttf",
         "C:\\Windows\\Fonts\\tahoma.ttf",
@@ -150,14 +150,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     for (const char* path : fontCandidates) {
         if (GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) {
             loadedFont = io.Fonts->AddFontFromFileTTF(path, 18.0f, &fontCfg, glyphRanges);
-            smallFont  = io.Fonts->AddFontFromFileTTF(path, 14.0f, &fontCfg, glyphRanges);
+            panelFont  = io.Fonts->AddFontFromFileTTF(path, 16.5f, &fontCfg, glyphRanges);
             if (loadedFont) break;
         }
     }
     if (!loadedFont) {
         loadedFont = io.Fonts->AddFontDefault();
     }
-    app.SetSmallFont(smallFont);
+    app.SetPanelFont(panelFont);
 
     // ───────────────── CASCADING RENDERER INITIALIZATION ─────────────────
     g_pRenderer = std::make_unique<DX11Renderer>(D3D_DRIVER_TYPE_HARDWARE);

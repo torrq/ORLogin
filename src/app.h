@@ -31,7 +31,7 @@ public:
     static constexpr const char* kVersion = "v0.3";
     const char* GetWindowTitle() const { return "OSRO Login Helper v0.3"; }
     bool IsDarkTheme() const { return m_settings.darkTheme; }
-    void SetSmallFont(ImFont* f) { m_smallFont = f; }
+    void SetPanelFont(ImFont* f) { m_panelFont = f; }
 
     void FlashStatus(const std::string& msg, ImVec4 color);
 
@@ -95,7 +95,7 @@ private:
     bool m_advancedSettingsOpen = false;
 
     // Fonts
-    ImFont* m_smallFont = nullptr;
+    ImFont* m_panelFont = nullptr;
 
     // Hotkey capture state
     bool m_capturingHotkey = false;
