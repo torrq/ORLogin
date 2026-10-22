@@ -4,6 +4,8 @@ A secure, high-performance login helper for **Oldschool Ragnarok Online (OSRO)**
 
 ---
 
+<img width="862" height="709" alt="image" src="https://github.com/user-attachments/assets/3ad52a8f-6083-4148-986b-aab784dfc8a2" />
+
 ## Features
 
 - **Encrypted Local Vault**:
