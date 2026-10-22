@@ -10,18 +10,20 @@
 #include <string>
 #include <thread>
 
+#include "game/client_monitor.h"
 #include "security/secure.h"
 #include "settings.h"
 
 struct TyperJob {
-    HWND          hwnd         = nullptr;
-    std::string   username;
-    SecureBytes   password;    // wiped immediately when the worker exits
-    LoginSequence sequence     = LoginSequence::IdTabPassword;
-    bool          clearIdField = true;
-    bool          pressEnter   = true;
-    InputMethod   method       = InputMethod::PostMessage;
-    int           keyDelayMs   = 15;
+    HWND            hwnd         = nullptr;
+    std::string     username;
+    SecureBytes     password;    // wiped immediately when the worker exits
+    LoginSequence   sequence     = LoginSequence::IdTabPassword;
+    LoginFieldFocus currentFocus = LoginFieldFocus::Unknown;
+    bool            clearIdField = true;
+    bool            pressEnter   = true;
+    InputMethod     method       = InputMethod::PostMessage;
+    int             keyDelayMs   = 15;
 };
 
 class Typer {

@@ -175,17 +175,35 @@ void Typer::Run(TyperJob job, std::atomic<bool>* busyFlag) {
     int delay = std::clamp(job.keyDelayMs, 1, 200);
 
     if (job.sequence == LoginSequence::IdTabPassword) {
+        // Auto-align: if client is currently focused on the Password field,
+        // send Tab first to cycle focus to the User ID field before typing.
+        if (job.currentFocus == LoginFieldFocus::Password) {
+            TapKey(job.hwnd, job.method, VK_TAB, std::max(delay, 25));
+            Sleep(25);
+        }
         if (job.clearIdField) ClearField(job.hwnd, job.method, delay);
         TypeBytes(job.hwnd, job.method,
                   reinterpret_cast<const uint8_t*>(job.username.data()), job.username.size(),
                   delay);
         TapKey(job.hwnd, job.method, VK_TAB, std::max(delay, 20));
+    } else if (job.sequence == LoginSequence::PasswordOnly) {
+        // Auto-align: if client is currently focused on User ID,
+        // send Tab first to cycle focus to the Password field.
+        if (job.currentFocus == LoginFieldFocus::UserId) {
+            TapKey(job.hwnd, job.method, VK_TAB, std::max(delay, 25));
+            Sleep(25);
+        }
     }
 
     TypeBytes(job.hwnd, job.method, job.password.data(), job.password.size(), delay);
 
     if (job.pressEnter) {
-        Sleep(20);
+        // First Return submits username and password
+        Sleep(std::max(delay, 25));
+        TapKey(job.hwnd, job.method, VK_RETURN, std::max(delay, 20));
+
+        // Slight pause, then second Return to select service/server and proceed to Char Select
+        Sleep(150);
         TapKey(job.hwnd, job.method, VK_RETURN, std::max(delay, 20));
     }
 }

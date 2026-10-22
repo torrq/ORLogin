@@ -41,6 +41,15 @@ bool IsClientInGame(uint32_t mode, uint32_t inGame) {
 }
 ```
 
+### 1.4 Login Input Field Focus Detection (`0x0107A13C`)
+- When at the login screen, static address `0x0107A13C` (`uint32_t`) identifies which input field currently holds active keyboard focus:
+  - **`5`**: **User ID** input field focused.
+  - **`0`**: **Password** input field focused.
+- Active input caret screen Y-coordinates corroborate this state:
+  - User ID input box caret: Y = `106` (`0x6A`)
+  - Password input box caret: Y = `138` (`0x8A`, 32px vertical offset)
+- **Auto-Alignment**: Before executing `ID + Tab + Pass`, read `0x0107A13C`. If `0` (Password), dispatch a single <kbd>Tab</kbd> to align focus to User ID first. For `Password Only`, if `5` (User ID), dispatch a <kbd>Tab</kbd> to align to Password.
+
 ---
 
 ## 2. Window Enumeration & Viewport Discovery
@@ -89,11 +98,12 @@ HWND FindGameWindow(DWORD targetPid) {
   - Requires `SetForegroundWindow(hwnd)`.
   - Must ensure any user-held modifier keys (e.g. `Ctrl`, `Shift` from the trigger hotkey) are released before dispatching characters, otherwise `Ctrl + char` shortcuts may fire inside the game.
 
-### 3.2 Login Form Field Reset
+### 3.2 Login Form Field Reset & Double Return Sequence
 When typing into the RO login form:
-1. Tap `VK_END` to place the caret at the end of the ID field.
-2. Send 24 consecutive `VK_BACK` taps (RO account usernames have a hard cap of 24 characters).
-3. Type username string $\rightarrow$ Tap `VK_TAB` $\rightarrow$ Type password string $\rightarrow$ Tap `VK_RETURN`.
+1. **Focus Alignment**: Check `LoginFocusAddress` (`0x0107A13C`). If focus is on Password (`0`), send `VK_TAB` first to bring focus to User ID.
+2. **Clear ID Field**: Tap `VK_END` to place the caret at the end of the ID field, then send 24 consecutive `VK_BACK` taps (RO account usernames have a hard cap of 24 characters).
+3. **Type Credentials**: Type username string $\rightarrow$ Tap `VK_TAB` $\rightarrow$ Type password string.
+4. **Double Return**: Tap `VK_RETURN` (submits credentials), pause for ~150ms, then tap `VK_RETURN` a second time (confirms Service/Server selection and immediately advances into Character Selection).
 
 ---
 

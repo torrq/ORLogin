@@ -20,6 +20,15 @@ This document records the architectural choices, reverse-engineering discoveries
 - **Discovery**: Direct3D wrappers and borderless hooks can cause `IsWindowVisible(hwnd)` to return `FALSE` or set non-standard owner hierarchies.
 - **Decision**: Filter top-level windows strictly by matching `GetWindowThreadProcessId == targetPid` and client rect dimensions `width > 200 && height > 200`.
 
+### 1.4 Login Input Field Focus Detection (`0x0107A13C`)
+- **Problem**: If the game client had the Password input box focused (via prior click or Tab), triggering a standard `ID + Tab + Pass` sequence would inadvertently type the username into the password field.
+- **Discovery**: 3-way differential memory scanning across 380MB of committed pages (User ID $\rightarrow$ Password $\rightarrow$ User ID) isolated static module address `0x0107A13C` in `OSRO.exe`:
+  - `5` (`0x05`) = User ID field currently focused (Control ID 5).
+  - `0` (`0x00`) = Password field currently focused (Control ID 0).
+  - Corroborated with active input caret screen coordinates: Y = `106` (User ID) vs Y = `138` (Password, exactly 32px vertical offset).
+- **Decision**: In `Typer`, inspect `ClientInfo::loginFocus`. If the target client is focused on the wrong field for the requested sequence, automatically dispatch a single <kbd>Tab</kbd> to align focus before credential dispatch.
+- **Double Return Sequence**: Send two consecutive <kbd>Return</kbd> taps separated by a 150ms pause to submit credentials and immediately confirm the Service/Server select prompt into Character Selection.
+
 ---
 
 ## 2. Desktop Framework & Architecture

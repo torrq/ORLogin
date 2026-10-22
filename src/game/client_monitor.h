@@ -17,15 +17,23 @@ enum class ClientState {
     InGame,
 };
 
+enum class LoginFieldFocus {
+    Unknown,
+    UserId,
+    Password,
+};
+
 struct ClientInfo {
-    DWORD       pid   = 0;
-    HWND        hwnd  = nullptr;
-    ClientState state = ClientState::NoAccess;
-    std::string charName;
-    std::string map;
+    DWORD           pid        = 0;
+    HWND            hwnd       = nullptr;
+    ClientState     state      = ClientState::NoAccess;
+    LoginFieldFocus loginFocus = LoginFieldFocus::Unknown;
+    std::string     charName;
+    std::string     map;
 };
 
 const char* ClientStateText(ClientState s);
+const char* LoginFocusText(LoginFieldFocus f);
 
 class ClientMonitor {
 public:
@@ -39,7 +47,7 @@ public:
     const ServerProfile& Profile() const { return m_profile; }
 
 private:
-    ClientState ReadState(ProcessReader& r, std::string& name, std::string& map) const;
+    ClientState ReadState(ProcessReader& r, std::string& name, std::string& map, LoginFieldFocus& outFocus) const;
     static HWND FindMainWindow(DWORD pid);
 
     const ServerProfile& m_profile;

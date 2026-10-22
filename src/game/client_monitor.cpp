@@ -12,6 +12,15 @@ const char* ClientStateText(ClientState s) {
     return "?";
 }
 
+const char* LoginFocusText(LoginFieldFocus f) {
+    switch (f) {
+    case LoginFieldFocus::UserId:   return "User ID";
+    case LoginFieldFocus::Password: return "Password";
+    case LoginFieldFocus::Unknown:  return "Unknown";
+    }
+    return "?";
+}
+
 const ClientInfo* ClientMonitor::FindByPid(DWORD pid) const {
     for (const auto& c : m_clients)
         if (c.pid == pid) return &c;
@@ -51,7 +60,7 @@ void ClientMonitor::Refresh() {
         ClientInfo info;
         info.pid  = pid;
         info.hwnd = FindMainWindow(pid);
-        info.state = reader->IsOpen() ? ReadState(*reader, info.charName, info.map) : ClientState::NoAccess;
+        info.state = reader->IsOpen() ? ReadState(*reader, info.charName, info.map, info.loginFocus) : ClientState::NoAccess;
         if (info.state == ClientState::NoAccess) reader.reset(); // retry opening next refresh
         next.push_back(std::move(info));
     }
@@ -63,10 +72,11 @@ void ClientMonitor::Refresh() {
 // server/character select screens. A dedicated login-screen signal still needs to be
 // discovered (see .agents/knowledge/domain/login_detection.md); until then AtLogin
 // means "not in-game", which is a safe precondition for typing credentials.
-ClientState ClientMonitor::ReadState(ProcessReader& r, std::string& name, std::string& map) const {
+ClientState ClientMonitor::ReadState(ProcessReader& r, std::string& name, std::string& map, LoginFieldFocus& outFocus) const {
     uint32_t inGame = 0;
     uint32_t mode = 0;
     if (!r.ReadU32(m_profile.inGameAddress, inGame) || !r.ReadU32(m_profile.modeAddress, mode)) {
+        outFocus = LoginFieldFocus::Unknown;
         return ClientState::NoAccess;
     }
 
@@ -74,11 +84,25 @@ ClientState ClientMonitor::ReadState(ProcessReader& r, std::string& name, std::s
     if (inGame == 1 || mode == 2) {
         name = r.ReadString(m_profile.nameAddress, 24);
         map  = r.ReadString(m_profile.mapAddress, 16);
+        outFocus = LoginFieldFocus::Unknown;
         return ClientState::InGame;
     }
 
     name.clear();
     map.clear();
+
+    outFocus = LoginFieldFocus::Unknown;
+    if (m_profile.loginFocusAddress != 0) {
+        uint32_t focusVal = 0;
+        if (r.ReadU32(m_profile.loginFocusAddress, focusVal)) {
+            if (focusVal == 5) {
+                outFocus = LoginFieldFocus::UserId;
+            } else if (focusVal == 0) {
+                outFocus = LoginFieldFocus::Password;
+            }
+        }
+    }
+
     return ClientState::AtLogin;
 }
 

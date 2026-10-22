@@ -264,6 +264,7 @@ void App::OnHotkey() {
     job.username     = acc.username;
     job.password     = acc.password.Reveal();
     job.sequence     = m_settings.sequence;
+    job.currentFocus = target->loginFocus;
     job.clearIdField = m_settings.clearIdField;
     job.pressEnter   = m_settings.pressEnter;
     job.method       = m_settings.inputMethod;
@@ -709,6 +710,13 @@ void App::RenderClientsPanel() {
         std::string status = ClientStateText(cl.state);
         if (cl.state == ClientState::AtLogin) {
             dotColor = c.green;
+            if (cl.loginFocus == LoginFieldFocus::UserId) {
+                status = "At Login (User ID)";
+            } else if (cl.loginFocus == LoginFieldFocus::Password) {
+                status = "At Login (Password)";
+            } else {
+                status = "At Login";
+            }
         } else if (cl.state == ClientState::InGame) {
             dotColor = c.amber;
             if (!cl.charName.empty()) {
@@ -769,7 +777,7 @@ void App::RenderSettingsPanel() {
         if (m_settings.sequence == LoginSequence::IdTabPassword) {
             if (ImGui::Checkbox("Clear ID field first", &m_settings.clearIdField)) SaveSettings();
         }
-        if (ImGui::Checkbox("Press Enter after typing", &m_settings.pressEnter)) SaveSettings();
+        if (ImGui::Checkbox("Press Enter twice after typing", &m_settings.pressEnter)) SaveSettings();
 
         // ────── Right Column: Method, Safety & Timers ──────
         ImGui::TableSetColumnIndex(1);

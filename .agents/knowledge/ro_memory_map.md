@@ -12,6 +12,7 @@
 |---|---|---|---|
 | `InGameAddress` | `0x010DCCBC` | uint32 | **`1`** when active inside the game world. **`0`** when logged out / at login screen / at character selection. |
 | `ModeAddress` | `0x0107AA84` | uint32 | **`2`** when in Game Mode (`CGameMode`). **`0`** when at Login Screen or Character Selection. |
+| `LoginFocusAddress` | `0x0107A13C` | uint32 | **`5`** when User ID input field is focused. **`0`** when Password input field is focused. Corroborated with caret Y-pos (`106` vs `138`). |
 | `PlayerLoaded` | `0x010DFAEC` | uint32 | **`1`** when player character entity is spawned into the world. **`0`** when logged out. |
 | `NameAddress` | `0x010DF5D8` | char[24] | Character name in ANSI (CP-1252). Note: The game client does **not** zero this out when logging out to login screen; check `InGameAddress == 1` first. |
 | `MapAddress` | `0x010D856C` | char[16] | Current map name (e.g. `prontera`). Retains previous map until new game entry. |
