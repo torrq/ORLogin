@@ -608,7 +608,7 @@ void App::RenderMainScreen() {
     float footerReserve = 34.0f;
     float contentH = ImGui::GetContentRegionAvail().y - footerReserve;
 
-    float bottomH  = 130.0f;
+    float bottomH  = 165.0f;
     float accountsH = std::max(180.0f, contentH - bottomH - ImGui::GetStyle().ItemSpacing.y);
 
     ImGui::BeginChild("AccountsSection", ImVec2(0, accountsH), true);
