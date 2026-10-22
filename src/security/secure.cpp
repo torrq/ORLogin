@@ -13,23 +13,29 @@ namespace ImStb {
 
 // ───────────────────────────── ProtectedSecret ─────────────────────────────
 
-void ProtectedSecret::Set(const uint8_t* data, size_t len) {
+bool ProtectedSecret::Set(const uint8_t* data, size_t len) {
     Clear();
-    if (!data || len == 0) return;
+    if (!data || len == 0) return true;
 
     const size_t block  = CRYPTPROTECTMEMORY_BLOCK_SIZE;
     const size_t padded = ((len + block - 1) / block) * block;
 
-    m_blob.reserve(padded);
-    m_blob.assign(padded, 0);
+    try {
+        m_blob.reserve(padded);
+        m_blob.assign(padded, 0);
+    } catch (...) {
+        Clear();
+        return false;
+    }
     std::memcpy(m_blob.data(), data, len);
     m_len = len;
 
     if (!CryptProtectMemory(m_blob.data(), static_cast<DWORD>(padded), CRYPTPROTECTMEMORY_SAME_PROCESS)) {
         // Never keep an unprotected copy around if protection failed.
         Clear();
-        throw std::bad_alloc();
+        return false;
     }
+    return true;
 }
 
 SecureBytes ProtectedSecret::Reveal() const {

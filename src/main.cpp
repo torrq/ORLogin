@@ -63,6 +63,38 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) {
     (void)hInstance; (void)hPrevInstance; (void)pCmdLine;
 
+    // Secure DLL search order & prevent DLL hijacking
+    HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
+    if (hKernel32) {
+        typedef BOOL (WINAPI *SetDefaultDllDirectoriesFn)(DWORD DirectoryFlags);
+        auto pSetDefaultDllDirs = reinterpret_cast<SetDefaultDllDirectoriesFn>(
+            GetProcAddress(hKernel32, "SetDefaultDllDirectories"));
+        if (pSetDefaultDllDirs) {
+            pSetDefaultDllDirs(LOAD_LIBRARY_SEARCH_SYSTEM32);
+        }
+
+        typedef BOOL (WINAPI *SetSearchPathModeFn)(DWORD Flags);
+        auto pSetSearchPathMode = reinterpret_cast<SetSearchPathModeFn>(
+            GetProcAddress(hKernel32, "SetSearchPathMode"));
+        if (pSetSearchPathMode) {
+            pSetSearchPathMode(BASE_SEARCH_PATH_ENABLE_SAFE_SEARCHMODE | BASE_SEARCH_PATH_PERMANENT);
+        }
+    }
+
+    // Single-instance enforcement: activate existing instance if already running
+    HANDLE hSingleInstanceMutex = CreateMutexW(nullptr, TRUE, L"Local\\ORLogin_SingleInstance_Mutex_B6D83D71");
+    if (GetLastError() == ERROR_ALREADY_EXISTS) {
+        if (hSingleInstanceMutex) CloseHandle(hSingleInstanceMutex);
+        HWND existingHwnd = FindWindowW(L"ORLoginMainWindowClass", nullptr);
+        if (existingHwnd) {
+            if (IsIconic(existingHwnd)) {
+                ShowWindow(existingHwnd, SW_RESTORE);
+            }
+            SetForegroundWindow(existingHwnd);
+        }
+        return 0;
+    }
+
     // Raise working-set limits so VirtualLock succeeds for our secret buffers.
     Secure::InitProcessMemory();
 
@@ -217,6 +249,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     DestroyWindow(hwnd);
     UnregisterClassW(wc.lpszClassName, wc.hInstance);
+
+    if (hSingleInstanceMutex) {
+        CloseHandle(hSingleInstanceMutex);
+    }
 
     return 0;
 }

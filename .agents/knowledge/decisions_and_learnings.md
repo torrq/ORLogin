@@ -79,4 +79,38 @@ This document records the architectural choices, reverse-engineering discoveries
   - `keyHoldMs` (2-50 ms, def 10 ms): Hardware key-down hold duration before key-up.
 - **Keystroke Synthesis**: For `VK_RETURN`, `PostMessage` dispatches both `WM_KEYDOWN` and `WM_CHAR` (`0x0D`), ensuring modal dialogs that consume character events process the Enter key reliably.
 
+---
+
+## 4. Hardening & Security Remediation (v0.5)
+
+### 4.1 Authenticated Security Settings (Vault Payload v2)
+- **Problem**: Storing security timings (`keyDelayMs`, `autoLockMinutes`, `inputMethod`) in plaintext JSON allowed local unprivileged users or malware to alter delay parameters or disable lockouts without unlocking the vault.
+- **Solution**: Upgraded vault payload format to version 2. Security-critical parameters are serialized, authenticated, and encrypted inside `ORLogin.vault` via AES-256-GCM. Unauthenticated `ORLogin.settings.json` is restricted strictly to cosmetic/startup preferences (`theme`, `hotkeyVk`, `hotkeyMods`, `hideFromCapture`). Backward compatibility for payload v1 is maintained.
+
+### 4.2 Storage Location: Standard LocalAppData vs. Portable Mode
+- **Decision**: Default vault and settings storage moved to `%LOCALAPPDATA%\ORLogin\` to isolate user vaults within Windows user profile DACLs.
+- **Automatic Migration**: On launch, if `ORLogin.vault` exists in the executable folder but not yet in LocalAppData, it is automatically migrated with its backup and settings.
+- **Portable Support**: If `portable.flag` exists in the executable folder (or when compiled with `-DORLOGIN_PORTABLE=ON`), ORLogin operates in portable mode and keeps all files alongside the binary. The status bar displays `[Portable]` as confirmation.
+
+### 4.3 Master Password Policy (8-Character Minimum)
+- **Decision**: Vault creation and password rotation enforce a minimum length of 8 characters (blocking weak passwords while respecting user ergonomic preferences), backed by live entropy/class estimation.
+
+### 4.4 DLL Search-Order Hijacking Protection
+- **Context**: `ORLogin.manifest` specifies `requireAdministrator`. Elevated processes running from user-writable directories are vulnerable to DLL planting attacks (e.g. malicious `d3d11.dll` placed next to the `.exe`).
+- **Solution**:
+  1. Early startup in `wWinMain` calls `SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32)` and enables `BASE_SEARCH_PATH_ENABLE_SAFE_SEARCHMODE`.
+  2. MSVC linker configured with `/DEPENDENTLOADFLAG:0x800` to burn the System32 search constraint directly into the PE Load Config directory.
+
+### 4.5 Focus Check & In-Game Typing Hard-Block
+- **Context**: In-game typing risked dumping passwords into game public chat or trade windows if hotkey was triggered accidentally. Furthermore, when using `SendInput`, focus shifting away from the game during typing would leak remaining password characters into whatever window was active.
+- **Solution**:
+  1. Unconditionally block typing when `ClientInfo::state == ClientState::InGame`. The user toggle to disable this check is eliminated.
+  2. In `Typer::Run`, every character and keystroke under `SendInput` verifies `GetForegroundWindow() == job.hwnd`. If focus changes at any point during typing, the loop aborts immediately and memory buffers are purged.
+  3. Validate executable image name (`OSRO.exe`) via `QueryFullProcessImageNameW`.
+
+### 4.6 Single-Instance Mutex & Compiler Mitigations
+- **Single-Instance**: Named mutex `Local\ORLogin_SingleInstance_Mutex_B6D83D71` prevents duplicate processes from conflicting over the vault or hotkey; activates and restores the existing window if launched again.
+- **Compiler / Linker Mitigations**: Built with Control Flow Guard (`/guard:cf`), CET Shadow Stack (`/CETCOMPAT`), High-Entropy 64-bit ASLR (`/HIGHENTROPYVA`, `/DYNAMICBASE`), and DEP (`/NXCOMPAT`).
+
+
 

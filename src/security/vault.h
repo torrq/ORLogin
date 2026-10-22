@@ -26,6 +26,7 @@
 
 #include "security/crypto.h"
 #include "security/secure.h"
+#include "settings.h"
 
 struct Account {
     std::string     label;     // optional nickname shown in the UI
@@ -51,7 +52,7 @@ public:
     bool Exists() const;
 
     // Creates a brand-new empty vault protected by `master` and writes it to disk.
-    Status Create(const SecureBytes& master);
+    Status Create(const SecureBytes& master, const VaultSettings& initialSettings = {});
 
     // Derives the key from `master` and decrypts the vault file.
     Status Unlock(const SecureBytes& master);
@@ -69,6 +70,10 @@ public:
 
     std::vector<Account>&       Accounts()       { return m_accounts; }
     const std::vector<Account>& Accounts() const { return m_accounts; }
+
+    const VaultSettings& GetSettings() const { return m_settings; }
+    void                 SetSettings(const VaultSettings& s) { m_settings = s; }
+    bool                 HasLoadedSettings() const { return m_hasSettings; }
 
     int  ActiveIndex() const { return m_active; }
     void SetActiveIndex(int idx) { m_active = idx; NormalizeActive(); }
@@ -95,4 +100,6 @@ private:
     uint32_t              m_iterations = kDefaultIterations;
     std::vector<Account>  m_accounts;
     int                   m_active = -1;
+    VaultSettings         m_settings;
+    bool                  m_hasSettings = false;
 };

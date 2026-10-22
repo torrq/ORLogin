@@ -28,8 +28,8 @@ public:
     void OnSessionLock();
     bool HandleCloseRequest(HWND hwnd);
 
-    static constexpr const char* kVersion = "v0.4";
-    const char* GetWindowTitle() const { return "OSRO Login Helper v0.4"; }
+    static constexpr const char* kVersion = "v0.5";
+    const char* GetWindowTitle() const { return "OSRO Login Helper v0.5"; }
     bool IsDarkTheme() const { return m_settings.darkTheme; }
     void SetPanelFont(ImFont* f) { m_panelFont = f; }
 
@@ -61,7 +61,7 @@ private:
     static constexpr size_t kPwBufSize = 256;
 
     HWND                  m_hwnd = nullptr;
-    std::filesystem::path m_exeDir;
+    std::filesystem::path m_storageDir;
     std::filesystem::path m_settingsPath;
     Settings              m_settings;
     Vault                 m_vault;

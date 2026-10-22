@@ -10,7 +10,7 @@ constexpr char     kMagic[4]       = { 'O', 'R', 'L', 'V' };
 constexpr uint16_t kFormatVersion  = 1;
 constexpr uint16_t kKdfPbkdf2      = 1;
 constexpr size_t   kHeaderSize     = 44;
-constexpr uint32_t kPayloadVersion = 1;
+constexpr uint32_t kPayloadVersion = 2;
 constexpr uint32_t kMaxCiphertext  = 16u * 1024u * 1024u;
 constexpr uint32_t kMaxAccounts    = 10000;
 constexpr uint32_t kMaxFieldLen    = 4096;
@@ -172,7 +172,7 @@ Vault::Status Vault::DecryptWithKey(const std::vector<uint8_t>& file, const Secu
 // ───────────────────────────── Payload ─────────────────────────────
 
 SecureBytes Vault::SerializePayload() const {
-    size_t estimate = 12;
+    size_t estimate = 12 + 44;
     for (const auto& a : m_accounts) estimate += 12 + a.label.size() + a.username.size() + a.password.Size();
 
     SecureBytes b;
@@ -186,13 +186,28 @@ SecureBytes Vault::SerializePayload() const {
         SecureBytes pw = a.password.Reveal();
         AppendField(b, pw.data(), pw.size());
     }
+
+    // Vault payload version 2: Authenticated security settings
+    AppendU32(b, (uint32_t)m_settings.sequence);
+    AppendU32(b, m_settings.clearIdField ? 1u : 0u);
+    AppendU32(b, m_settings.pressEnter ? 1u : 0u);
+    AppendU32(b, (uint32_t)m_settings.inputMethod);
+    AppendU32(b, (uint32_t)m_settings.keyDelayMs);
+    AppendU32(b, (uint32_t)m_settings.enterDelayMs);
+    AppendU32(b, (uint32_t)m_settings.tabDelayMs);
+    AppendU32(b, (uint32_t)m_settings.clearDelayMs);
+    AppendU32(b, (uint32_t)m_settings.keyHoldMs);
+    AppendU32(b, (uint32_t)m_settings.autoLockMinutes);
+    AppendU32(b, m_settings.requireLoginScreen ? 1u : 0u);
+
     return b;
 }
 
 bool Vault::DeserializePayload(const SecureBytes& plain) {
     Reader r{ plain };
     uint32_t version = 0, active = 0, count = 0;
-    if (!r.ReadU32(version) || version != kPayloadVersion) return false;
+    if (!r.ReadU32(version)) return false;
+    if (version != 1 && version != 2) return false;
     if (!r.ReadU32(active) || !r.ReadU32(count) || count > kMaxAccounts) return false;
 
     std::vector<Account> accounts;
@@ -206,10 +221,36 @@ bool Vault::DeserializePayload(const SecureBytes& plain) {
         if (!r.ReadField(d, len)) return false;
         a.username.assign((const char*)d, len);
         if (!r.ReadField(d, len)) return false;
-        a.password.Set(d, len);
+        if (!a.password.Set(d, len)) return false;
         accounts.push_back(std::move(a));
     }
-    if (r.pos != plain.size()) return false;
+
+    if (version == 1) {
+        if (r.pos != plain.size()) return false;
+        m_hasSettings = false;
+    } else if (version == 2) {
+        uint32_t seq = 0, clr = 0, enter = 0, meth = 0;
+        uint32_t kDel = 0, eDel = 0, tDel = 0, cDel = 0, kHld = 0, lockM = 0, reqLogin = 0;
+        if (!r.ReadU32(seq) || !r.ReadU32(clr) || !r.ReadU32(enter) || !r.ReadU32(meth) ||
+            !r.ReadU32(kDel) || !r.ReadU32(eDel) || !r.ReadU32(tDel) || !r.ReadU32(cDel) ||
+            !r.ReadU32(kHld) || !r.ReadU32(lockM) || !r.ReadU32(reqLogin)) {
+            return false;
+        }
+        if (r.pos != plain.size()) return false;
+
+        m_settings.sequence           = (seq == 1) ? LoginSequence::PasswordOnly : LoginSequence::IdTabPassword;
+        m_settings.clearIdField       = (clr != 0);
+        m_settings.pressEnter         = (enter != 0);
+        m_settings.inputMethod        = (meth == 1) ? InputMethod::SendInput : InputMethod::PostMessage;
+        m_settings.keyDelayMs         = std::clamp((int)kDel, 1, 200);
+        m_settings.enterDelayMs       = std::clamp((int)eDel, 20, 1000);
+        m_settings.tabDelayMs         = std::clamp((int)tDel, 5, 500);
+        m_settings.clearDelayMs       = std::clamp((int)cDel, 1, 50);
+        m_settings.keyHoldMs          = std::clamp((int)kHld, 2, 100);
+        m_settings.autoLockMinutes    = std::clamp((int)lockM, 0, 240);
+        m_settings.requireLoginScreen = (reqLogin != 0);
+        m_hasSettings                 = true;
+    }
 
     m_accounts = std::move(accounts);
     m_active   = (int)(int32_t)active;
@@ -219,7 +260,7 @@ bool Vault::DeserializePayload(const SecureBytes& plain) {
 
 // ───────────────────────────── Public API ─────────────────────────────
 
-Vault::Status Vault::Create(const SecureBytes& master) {
+Vault::Status Vault::Create(const SecureBytes& master, const VaultSettings& initialSettings) {
     Lock();
     uint8_t salt[Crypto::kSaltSize];
     if (!Crypto::Random(salt, sizeof(salt))) return Status::CryptoError;
@@ -230,10 +271,15 @@ Vault::Status Vault::Create(const SecureBytes& master) {
 
     std::memcpy(m_salt, salt, sizeof(salt));
     m_iterations = kDefaultIterations;
-    m_key.Set(key);
+    if (!m_key.Set(key)) {
+        Lock();
+        return Status::CryptoError;
+    }
     m_accounts.clear();
-    m_active   = -1;
-    m_unlocked = true;
+    m_active      = -1;
+    m_settings    = initialSettings;
+    m_hasSettings = true;
+    m_unlocked    = true;
 
     s = Save();
     if (s != Status::Ok) Lock();
@@ -266,7 +312,10 @@ Vault::Status Vault::Unlock(const SecureBytes& master) {
 
     std::memcpy(m_salt, salt, sizeof(salt));
     m_iterations = iterations;
-    m_key.Set(key);
+    if (!m_key.Set(key)) {
+        Lock();
+        return Status::CryptoError;
+    }
     m_unlocked = true;
     return Status::Ok;
 }
@@ -321,14 +370,29 @@ Vault::Status Vault::ChangeMasterPassword(const SecureBytes& current, const Secu
 
     std::memcpy(m_salt, salt, sizeof(salt));
     m_iterations = kDefaultIterations;
-    m_key.Set(newKey);
+    if (!m_key.Set(newKey)) {
+        std::memcpy(m_salt, oldSalt, sizeof(oldSalt));
+        m_iterations = oldIters;
+        m_key.Set(key);
+        return Status::CryptoError;
+    }
 
     s = Save();
     if (s != Status::Ok) {
         std::memcpy(m_salt, oldSalt, sizeof(oldSalt));
         m_iterations = oldIters;
         m_key.Set(key);
+        return s;
     }
+
+    // Refresh .bak with the new key ciphertext so no stale old-password ciphertexts linger
+    std::filesystem::path bak = m_path; bak += L".bak";
+    CopyFileW(m_path.c_str(), bak.c_str(), FALSE);
+
+    // Clean up any temporary file residue
+    std::filesystem::path tmp = m_path; tmp += L".tmp";
+    DeleteFileW(tmp.c_str());
+
     return s;
 }
 
@@ -342,6 +406,8 @@ void Vault::Lock() {
     m_accounts.shrink_to_fit();
     m_key.Clear();
     SecureZeroMemory(m_salt, sizeof(m_salt));
-    m_active   = -1;
-    m_unlocked = false;
+    m_active      = -1;
+    m_settings    = VaultSettings{};
+    m_hasSettings = false;
+    m_unlocked    = false;
 }

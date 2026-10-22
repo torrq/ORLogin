@@ -163,10 +163,10 @@ void ApplyTitleBarDarkMode(HWND hwnd, bool dark) {
 } // namespace
 
 App::App()
-    : m_exeDir(FsUtils::GetExeDir())
-    , m_settingsPath(m_exeDir / L"ORLogin.settings.json")
+    : m_storageDir(FsUtils::GetStorageDir())
+    , m_settingsPath(m_storageDir / L"ORLogin.settings.json")
     , m_settings(SettingsIO::Load(m_settingsPath))
-    , m_vault(m_exeDir / L"ORLogin.vault")
+    , m_vault(m_storageDir / L"ORLogin.vault")
     , m_monitor(Servers::HighRate)
     , m_pwBuf1(kPwBufSize, 0)
     , m_pwBuf2(kPwBufSize, 0)
@@ -217,6 +217,10 @@ void App::ApplySettingsToSystem() {
 
 void App::SaveSettings() {
     SettingsIO::Save(m_settingsPath, m_settings);
+    if (m_vault.IsUnlocked()) {
+        m_vault.SetSettings(m_settings.ToVaultSettings());
+        m_vault.Save();
+    }
 }
 
 void App::WipeFormBuffers() {
@@ -238,6 +242,7 @@ void App::LockVault(const char* reason) {
     m_advancedSettingsOpen = false;
     m_capturingHotkey     = false;
     m_focusMasterInput    = true;
+    m_lastActivityTick    = 0;
     WipeFormBuffers();
     m_vault.Lock();
     if (reason) {
@@ -329,12 +334,14 @@ void App::OnHotkey() {
         return;
     }
 
-    if (m_settings.requireLoginScreen && target->state != ClientState::AtLogin) {
-        if (target->state == ClientState::InGame) {
-            FlashStatus("Blocked: client is already in-game (" + target->charName + ")", c.amber);
-        } else {
-            FlashStatus("Blocked: cannot read client memory (is ORLogin running as Admin?)", c.red);
-        }
+    if (target->state == ClientState::InGame) {
+        std::string who = target->charName.empty() ? "" : (" (" + target->charName + ")");
+        FlashStatus("Blocked: client is already in-game" + who, c.amber);
+        return;
+    }
+
+    if (target->state != ClientState::AtLogin) {
+        FlashStatus("Blocked: client is not at login screen", c.amber);
         return;
     }
 
@@ -556,14 +563,15 @@ void App::RenderCreateVaultScreen() {
         SecureBytes p1 = SecureFromEditBuffer(m_pwBuf1);
         SecureBytes p2 = SecureFromEditBuffer(m_pwBuf2);
 
-        if (p1.size() < 4) {
-            FlashStatus("Master password must be at least 4 characters", c.red);
+        if (p1.size() < 8) {
+            FlashStatus("Master password must be at least 8 characters", c.red);
         } else if (p1 != p2) {
             FlashStatus("Passwords do not match", c.red);
         } else {
             WipeFormBuffers();
-            Vault::Status st = m_vault.Create(p1);
+            Vault::Status st = m_vault.Create(p1, m_settings.ToVaultSettings());
             if (st == Vault::Status::Ok) {
+                TouchActivity();
                 FlashStatus("Encrypted vault created", c.green);
             } else {
                 FlashStatus(Vault::StatusText(st), c.red);
@@ -618,6 +626,11 @@ void App::RenderUnlockScreen() {
         if (st == Vault::Status::Ok) {
             m_failedUnlocks     = 0;
             m_cooldownUntilTick = 0;
+            TouchActivity();
+            if (m_vault.HasLoadedSettings()) {
+                m_settings.FromVaultSettings(m_vault.GetSettings());
+                ApplySettingsToSystem();
+            }
             FlashStatus("Vault unlocked", c.green);
         } else {
             ++m_failedUnlocks;
@@ -986,21 +999,24 @@ void App::RenderAccountModal() {
                 Account a;
                 a.label    = m_labelBuf;
                 a.username = m_userBuf;
-                a.password.Set(pw);
-                if (m_editingIndex < 0) {
-                    accounts.push_back(std::move(a));
-                    if (m_vault.ActiveIndex() < 0) m_vault.SetActiveIndex((int)accounts.size() - 1);
-                } else if (m_editingIndex < (int)accounts.size()) {
-                    accounts[m_editingIndex] = std::move(a);
-                }
-                m_vault.NormalizeActive();
-                m_accountFormOpen = false;
-                WipeFormBuffers();
-                ImGui::CloseCurrentPopup();
+                if (!a.password.Set(pw)) {
+                    FlashStatus("Failed to securely protect password in memory", c.red);
+                } else {
+                    if (m_editingIndex < 0) {
+                        accounts.push_back(std::move(a));
+                        if (m_vault.ActiveIndex() < 0) m_vault.SetActiveIndex((int)accounts.size() - 1);
+                    } else if (m_editingIndex < (int)accounts.size()) {
+                        accounts[m_editingIndex] = std::move(a);
+                    }
+                    m_vault.NormalizeActive();
+                    m_accountFormOpen = false;
+                    WipeFormBuffers();
+                    ImGui::CloseCurrentPopup();
 
-                Vault::Status st = m_vault.Save();
-                FlashStatus(st == Vault::Status::Ok ? "Account saved & encrypted" : Vault::StatusText(st),
-                            st == Vault::Status::Ok ? c.green : c.red);
+                    Vault::Status st = m_vault.Save();
+                    FlashStatus(st == Vault::Status::Ok ? "Account saved & encrypted" : Vault::StatusText(st),
+                                st == Vault::Status::Ok ? c.green : c.red);
+                }
             }
         }
 
@@ -1053,8 +1069,8 @@ void App::RenderChangeMasterModal() {
             SecureBytes cur = SecureFromEditBuffer(m_pwBuf1);
             SecureBytes n1  = SecureFromEditBuffer(m_pwBuf2);
             SecureBytes n2  = SecureFromEditBuffer(m_pwBuf3);
-            if (n1.size() < 4) {
-                FlashStatus("New master password must be at least 4 characters", c.red);
+            if (n1.size() < 8) {
+                FlashStatus("New master password must be at least 8 characters", c.red);
             } else if (n1 != n2) {
                 FlashStatus("New passwords do not match", c.red);
             } else {
@@ -1136,9 +1152,7 @@ void App::RenderAdvancedSettingsModal() {
         }
         if (ImGui::Checkbox("Press Enter twice after typing (confirm Service Select)", &m_settings.pressEnter)) SaveSettings();
 
-        if (ImGui::Checkbox("Only send at Login screen", &m_settings.requireLoginScreen)) {
-            SaveSettings();
-        }
+        ImGui::TextColored(c.green, "Login Screen Protection: Enforced (In-game typing strictly blocked)");
 
         ImGui::Spacing();
         ImGui::Separator();
@@ -1230,7 +1244,8 @@ void App::RenderStatusBar() {
         text  = m_status.text;
         color = m_status.color;
     } else {
-        text = m_vault.IsUnlocked() ? "Vault: Unlocked (AES-256-GCM)" : "Vault: Locked";
+        std::string mode = FsUtils::IsPortableMode() ? " [Portable]" : "";
+        text = m_vault.IsUnlocked() ? ("Vault: Unlocked (AES-256-GCM)" + mode) : ("Vault: Locked" + mode);
     }
 
     float textW = ImGui::CalcTextSize(text.c_str()).x;

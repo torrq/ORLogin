@@ -40,21 +40,10 @@ Settings Load(const std::filesystem::path& path) {
 
 bool Save(const std::filesystem::path& path, const Settings& s) {
     json j;
-    j["theme"]              = s.darkTheme ? "dark" : "light";
-    j["hotkeyVk"]           = s.hotkeyVk;
-    j["hotkeyMods"]         = s.hotkeyMods;
-    j["sequence"]           = (int)s.sequence;
-    j["clearIdField"]       = s.clearIdField;
-    j["pressEnter"]         = s.pressEnter;
-    j["enterDelayMs"]       = s.enterDelayMs;
-    j["inputMethod"]        = (int)s.inputMethod;
-    j["keyDelayMs"]         = s.keyDelayMs;
-    j["tabDelayMs"]         = s.tabDelayMs;
-    j["clearDelayMs"]       = s.clearDelayMs;
-    j["keyHoldMs"]          = s.keyHoldMs;
-    j["autoLockMinutes"]    = s.autoLockMinutes;
-    j["requireLoginScreen"] = s.requireLoginScreen;
-    j["hideFromCapture"]    = s.hideFromCapture;
+    j["theme"]           = s.darkTheme ? "dark" : "light";
+    j["hotkeyVk"]        = s.hotkeyVk;
+    j["hotkeyMods"]      = s.hotkeyMods;
+    j["hideFromCapture"] = s.hideFromCapture;
     return FsUtils::WriteTextFile(path, j.dump(2));
 }
 

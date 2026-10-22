@@ -102,41 +102,60 @@ void SendInputCharUnit(wchar_t ch, int holdMs) {
     }
 }
 
-void TapKey(HWND hwnd, InputMethod method, UINT vk, int delayMs, int holdMs = 0) {
+bool TapKey(HWND hwnd, InputMethod method, UINT vk, int delayMs, int holdMs = 0) {
+    if (!IsWindow(hwnd)) return false;
     int hold = (holdMs > 0) ? holdMs : std::clamp(delayMs / 2, 5, 25);
-    if (method == InputMethod::PostMessage) PostKeyTap(hwnd, vk, hold);
-    else                                    SendInputKeyTap(vk, hold);
+    if (method == InputMethod::SendInput) {
+        if (GetForegroundWindow() != hwnd) return false;
+        SendInputKeyTap(vk, hold);
+    } else {
+        PostKeyTap(hwnd, vk, hold);
+    }
     if (delayMs > 0) Sleep(delayMs);
+    return true;
 }
 
-void TypeBytes(HWND hwnd, InputMethod method, const uint8_t* data, size_t len, int delayMs) {
-    if (!data || len == 0) return;
+bool TypeBytes(HWND hwnd, InputMethod method, const uint8_t* data, size_t len, int delayMs) {
+    if (!data || len == 0) return true;
     int wlen = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(data), (int)len, nullptr, 0);
-    if (wlen <= 0) return;
+    if (wlen <= 0) return true;
 
     SecureWide wbuf(static_cast<size_t>(wlen));
     MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(data), (int)len, wbuf.data(), wlen);
 
     int hold = std::clamp(delayMs / 2, 4, 20);
     for (int i = 0; i < wlen; ++i) {
-        if (!IsWindow(hwnd)) break;
-        if (method == InputMethod::PostMessage) PostCharUnit(hwnd, wbuf[i]);
-        else                                    SendInputCharUnit(wbuf[i], hold);
+        if (!IsWindow(hwnd)) return false;
+        if (method == InputMethod::SendInput) {
+            if (GetForegroundWindow() != hwnd) {
+                // Focus shifted away from target window; abort immediately to prevent leaking credentials!
+                return false;
+            }
+            SendInputCharUnit(wbuf[i], hold);
+        } else {
+            PostCharUnit(hwnd, wbuf[i]);
+        }
         if (delayMs > 0) Sleep(delayMs);
     }
+    return true;
 }
 
-void ClearField(HWND hwnd, InputMethod method, int clearDelayMs, int holdMs) {
+bool ClearField(HWND hwnd, InputMethod method, int clearDelayMs, int holdMs) {
     // Move to the end of the text box and erase up to 24 characters (RO account limit).
     int fastDelay = std::clamp(clearDelayMs, 1, 20);
-    TapKey(hwnd, method, VK_END, fastDelay, holdMs);
+    if (!TapKey(hwnd, method, VK_END, fastDelay, holdMs)) return false;
     for (int i = 0; i < 24; ++i) {
-        if (!IsWindow(hwnd)) return;
-        if (method == InputMethod::PostMessage) PostKeyTap(hwnd, VK_BACK, 1);
-        else                                    SendInputKeyTap(VK_BACK, 1);
+        if (!IsWindow(hwnd)) return false;
+        if (method == InputMethod::SendInput) {
+            if (GetForegroundWindow() != hwnd) return false;
+            SendInputKeyTap(VK_BACK, 1);
+        } else {
+            PostKeyTap(hwnd, VK_BACK, 1);
+        }
         if (fastDelay > 0) Sleep(fastDelay);
     }
     Sleep(10);
+    return true;
 }
 
 } // namespace
@@ -169,9 +188,36 @@ void Typer::Run(TyperJob job, std::atomic<bool>* busyFlag) {
 
     if (!job.hwnd || !IsWindow(job.hwnd)) return;
 
+    // Verify process identity to avoid typing into a spoofed or non-OSRO window
+    if (job.targetPid != 0) {
+        HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, job.targetPid);
+        if (hProcess) {
+            wchar_t exePath[MAX_PATH] = {};
+            DWORD size = MAX_PATH;
+            if (QueryFullProcessImageNameW(hProcess, 0, exePath, &size)) {
+                const wchar_t* base = wcsrchr(exePath, L'\\');
+                const wchar_t* filename = base ? (base + 1) : exePath;
+                if (_wcsicmp(filename, L"OSRO.exe") != 0) {
+                    CloseHandle(hProcess);
+                    return;
+                }
+            }
+            CloseHandle(hProcess);
+        }
+    }
+
     // Wait briefly for the user to let go of the hotkey modifiers (Ctrl/Shift/Alt)
     // so the game client doesn't see Ctrl+char or Shift+Tab.
     WaitUntilModifiersReleased();
+
+    if (job.method == InputMethod::SendInput) {
+        SetForegroundWindow(job.hwnd);
+        Sleep(30);
+        if (GetForegroundWindow() != job.hwnd) {
+            // Target window failed to gain foreground; abort typing to protect credentials
+            return;
+        }
+    }
 
     int delay = std::clamp(job.keyDelayMs, 1, 200);
     int hold  = std::clamp(job.keyHoldMs, 1, 100);
@@ -181,22 +227,24 @@ void Typer::Run(TyperJob job, std::atomic<bool>* busyFlag) {
         // Auto-align: if client is currently focused on the Password field,
         // send Tab first to cycle focus to the User ID field before typing.
         if (job.currentFocus == LoginFieldFocus::Password) {
-            TapKey(job.hwnd, job.method, VK_TAB, tabD, hold);
+            if (!TapKey(job.hwnd, job.method, VK_TAB, tabD, hold)) return;
         }
-        if (job.clearIdField) ClearField(job.hwnd, job.method, job.clearDelayMs, hold);
-        TypeBytes(job.hwnd, job.method,
-                  reinterpret_cast<const uint8_t*>(job.username.data()), job.username.size(),
-                  delay);
-        TapKey(job.hwnd, job.method, VK_TAB, tabD, hold);
+        if (job.clearIdField) {
+            if (!ClearField(job.hwnd, job.method, job.clearDelayMs, hold)) return;
+        }
+        if (!TypeBytes(job.hwnd, job.method,
+                       reinterpret_cast<const uint8_t*>(job.username.data()), job.username.size(),
+                       delay)) return;
+        if (!TapKey(job.hwnd, job.method, VK_TAB, tabD, hold)) return;
     } else if (job.sequence == LoginSequence::PasswordOnly) {
         // Auto-align: if client is currently focused on User ID,
         // send Tab first to cycle focus to the Password field.
         if (job.currentFocus == LoginFieldFocus::UserId) {
-            TapKey(job.hwnd, job.method, VK_TAB, tabD, hold);
+            if (!TapKey(job.hwnd, job.method, VK_TAB, tabD, hold)) return;
         }
     }
 
-    TypeBytes(job.hwnd, job.method, job.password.data(), job.password.size(), delay);
+    if (!TypeBytes(job.hwnd, job.method, job.password.data(), job.password.size(), delay)) return;
 
     if (job.pressEnter) {
         // Bring game window to foreground so dialogs and hardware input are active
@@ -248,9 +296,9 @@ void Typer::Run(TyperJob job, std::atomic<bool>* busyFlag) {
         if (GetForegroundWindow() != job.hwnd) {
             SetForegroundWindow(job.hwnd);
         }
-        if (GetForegroundWindow() == job.hwnd || job.method == InputMethod::SendInput) {
+        if (GetForegroundWindow() == job.hwnd) {
             SendInputKeyTap(VK_RETURN, hold);
-        } else {
+        } else if (job.method == InputMethod::PostMessage) {
             PostKeyTap(job.hwnd, VK_RETURN, hold);
         }
 

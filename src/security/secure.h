@@ -74,9 +74,9 @@ public:
     ProtectedSecret() = default;
     ProtectedSecret(const uint8_t* data, size_t len) { Set(data, len); }
 
-    // Replace contents. `data` is copied, then encrypted in place.
-    void Set(const uint8_t* data, size_t len);
-    void Set(const SecureBytes& data) { Set(data.data(), data.size()); }
+    // Replace contents. `data` is copied, then encrypted in place. Returns false on failure.
+    bool Set(const uint8_t* data, size_t len);
+    bool Set(const SecureBytes& data) { return Set(data.data(), data.size()); }
 
     // Decrypt into a fresh secure buffer (exact length). Wiped automatically on destruction.
     SecureBytes Reveal() const;
