@@ -21,11 +21,9 @@ echo [*] Found Visual Studio: %VS_DIR%
 call "%VS_DIR%\VC\Auxiliary\Build\vcvars64.bat" >nul
 
 :: Locate CMake
-for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -find "**/CMake/bin/cmake.exe"`) do (
-    set "CMAKE_EXE=%%i"
-)
-
-if not defined CMAKE_EXE (
+if exist "%VS_DIR%\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" (
+    set "CMAKE_EXE=%VS_DIR%\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+) else (
     set "CMAKE_EXE=cmake"
 )
 
