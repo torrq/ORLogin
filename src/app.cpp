@@ -385,7 +385,8 @@ void App::RenderUI(HWND hwnd) {
     ImGui::SetNextWindowSize(io.DisplaySize);
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                              ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
-                             ImGuiWindowFlags_NoBringToFrontOnFocus;
+                             ImGuiWindowFlags_NoBringToFrontOnFocus |
+                             ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
 
     ImGui::Begin("ORLoginRoot", nullptr, flags);
 
@@ -422,6 +423,53 @@ void App::RenderHeader() {
     ImGui::PushStyleColor(ImGuiCol_Text, c.accent);
     ImGui::SmallButton(m_monitor.Profile().label);
     ImGui::PopStyleColor(4);
+
+    // Hotkey: [ F9 ] placed right of server badge, in the middle / left of Advanced
+    ImGui::SameLine(0, 16.0f);
+    ImGui::TextColored(c.muted, "Hotkey:");
+    ImGui::SameLine();
+
+    std::string hkLabel = m_capturingHotkey
+        ? "Press keys... (Esc)"
+        : Hotkey::Format(m_settings.hotkeyMods, m_settings.hotkeyVk);
+    if (ImGui::SmallButton(hkLabel.c_str())) {
+        m_capturingHotkey = true;
+        Hotkey::Unregister(m_hwnd);
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Click to rebind login hotkey");
+    }
+    if (!m_hotkeyRegistered && !m_capturingHotkey) {
+        ImGui::SameLine();
+        ImGui::TextColored(c.red, "(conflict)");
+    }
+
+    if (m_capturingHotkey) {
+        if (GetAsyncKeyState(VK_ESCAPE) & 0x8000) {
+            m_capturingHotkey  = false;
+            m_hotkeyRegistered = Hotkey::Register(m_hwnd, m_settings.hotkeyMods, m_settings.hotkeyVk);
+        } else {
+            UINT mods = 0;
+            if (GetAsyncKeyState(VK_CONTROL) & 0x8000) mods |= MOD_CONTROL;
+            if (GetAsyncKeyState(VK_SHIFT)   & 0x8000) mods |= MOD_SHIFT;
+            if (GetAsyncKeyState(VK_MENU)    & 0x8000) mods |= MOD_ALT;
+            if ((GetAsyncKeyState(VK_LWIN) | GetAsyncKeyState(VK_RWIN)) & 0x8000) mods |= MOD_WIN;
+
+            for (UINT vk = 0x08; vk <= 0xFE; ++vk) {
+                if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON ||
+                    vk == VK_XBUTTON1 || vk == VK_XBUTTON2 || vk == VK_ESCAPE ||
+                    Hotkey::IsModifierKey(vk)) continue;
+                if (GetAsyncKeyState((int)vk) & 0x8000) {
+                    m_settings.hotkeyMods = mods;
+                    m_settings.hotkeyVk   = vk;
+                    m_capturingHotkey     = false;
+                    m_hotkeyRegistered    = Hotkey::Register(m_hwnd, m_settings.hotkeyMods, m_settings.hotkeyVk);
+                    SaveSettings();
+                    break;
+                }
+            }
+        }
+    }
 
     // Right-aligned controls: [Advanced...] [Master Password] [Lock Icon] [Theme Icon]
     float rightWidth = 34.0f; // Theme icon button width
@@ -614,7 +662,7 @@ void App::OpenEditAccountForm(int index) {
 }
 
 void App::RenderMainScreen() {
-    float footerReserve = 34.0f;
+    float footerReserve = 28.0f;
     float contentH = ImGui::GetContentRegionAvail().y - footerReserve;
 
     float bottomH  = 115.0f;
@@ -669,39 +717,87 @@ void App::RenderAccountsPanel() {
         return;
     }
 
+    std::vector<int> displayOrder(accounts.size());
+    for (size_t idx = 0; idx < accounts.size(); ++idx) displayOrder[idx] = (int)idx;
+
     ImGuiTableFlags tflags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH |
-                             ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
+                             ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp |
+                             ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Sortable;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(8.0f, 5.0f));
     if (ImGui::BeginTable("AccountsTable", 4, tflags)) {
-        ImGui::TableSetupColumn("Active",   ImGuiTableColumnFlags_WidthFixed, 54.0f);
-        ImGui::TableSetupColumn("Label",    ImGuiTableColumnFlags_WidthStretch, 1.0f);
+        ImGui::TableSetupColumn("  Active", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort, 68.0f);
+        ImGui::TableSetupColumn("Label",    ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultSort, 1.0f);
         ImGui::TableSetupColumn("Username", ImGuiTableColumnFlags_WidthStretch, 1.2f);
-        ImGui::TableSetupColumn("Actions",  ImGuiTableColumnFlags_WidthFixed, 210.0f);
+        ImGui::TableSetupColumn("Actions",  ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort, 215.0f);
+
+        // Sorting by Label or Username
+        if (ImGuiTableSortSpecs* sortsSpecs = ImGui::TableGetSortSpecs()) {
+            if (sortsSpecs->SpecsCount > 0) {
+                const ImGuiTableColumnSortSpecs* spec = &sortsSpecs->Specs[0];
+                int colIdx = spec->ColumnIndex;
+                bool asc = (spec->SortDirection == ImGuiSortDirection_Ascending);
+
+                auto compCase = [](const std::string& a, const std::string& b) {
+                    auto itA = a.begin(), itB = b.begin();
+                    while (itA != a.end() && itB != b.end()) {
+                        int diff = std::tolower((unsigned char)*itA) - std::tolower((unsigned char)*itB);
+                        if (diff != 0) return diff;
+                        ++itA; ++itB;
+                    }
+                    return (int)a.size() - (int)b.size();
+                };
+
+                std::sort(displayOrder.begin(), displayOrder.end(), [&](int aIdx, int bIdx) {
+                    int diff = 0;
+                    if (colIdx == 1) { // Label
+                        diff = compCase(accounts[aIdx].label, accounts[bIdx].label);
+                        if (diff == 0) diff = compCase(accounts[aIdx].username, accounts[bIdx].username);
+                    } else if (colIdx == 2) { // Username
+                        diff = compCase(accounts[aIdx].username, accounts[bIdx].username);
+                        if (diff == 0) diff = compCase(accounts[aIdx].label, accounts[bIdx].label);
+                    }
+                    return asc ? (diff < 0) : (diff > 0);
+                });
+            }
+        }
+
         ImGui::TableHeadersRow();
 
         int activeIdx = m_vault.ActiveIndex();
-        for (int i = 0; i < (int)accounts.size(); ++i) {
+        for (size_t row = 0; row < displayOrder.size(); ++row) {
+            int i = displayOrder[row];
             ImGui::PushID(i);
             ImGui::TableNextRow();
 
+            // Column 0: Active
             ImGui::TableSetColumnIndex(0);
+            ImGui::AlignTextToFramePadding();
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 8.0f);
             bool isActive = (i == activeIdx);
             if (ImGui::RadioButton("##active", isActive)) {
                 m_vault.SetActiveIndex(i);
                 m_vault.Save();
             }
 
+            // Column 1: Label
             ImGui::TableSetColumnIndex(1);
+            ImGui::AlignTextToFramePadding();
             if (accounts[i].label.empty()) ImGui::TextColored(c.muted, "-");
             else                           ImGui::TextUnformatted(accounts[i].label.c_str());
 
+            // Column 2: Username
             ImGui::TableSetColumnIndex(2);
+            ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted(accounts[i].username.c_str());
 
+            // Column 3: Actions
             ImGui::TableSetColumnIndex(3);
             if (m_confirmDeleteIndex == i) {
+                ImGui::AlignTextToFramePadding();
                 ImGui::TextColored(c.red, "Delete?");
                 ImGui::SameLine();
-                if (ImGui::SmallButton("Yes")) {
+                if (ImGui::Button("Yes", ImVec2(42.0f, 26.0f))) {
                     accounts[i].password.Clear();
                     if (!accounts[i].username.empty())
                         SecureZeroMemory(&accounts[i].username[0], accounts[i].username.size());
@@ -716,22 +812,23 @@ void App::RenderAccountsPanel() {
                     break;
                 }
                 ImGui::SameLine();
-                if (ImGui::SmallButton("No")) m_confirmDeleteIndex = -1;
+                if (ImGui::Button("No", ImVec2(42.0f, 26.0f))) m_confirmDeleteIndex = -1;
             } else {
-                if (ImGui::SmallButton("Send")) {
+                if (ImGui::Button("Send", ImVec2(52.0f, 26.0f))) {
                     m_vault.SetActiveIndex(i);
                     m_vault.Save();
                     OnHotkey();
                 }
                 ImGui::SameLine();
-                if (ImGui::SmallButton("Edit")) OpenEditAccountForm(i);
+                if (ImGui::Button("Edit", ImVec2(50.0f, 26.0f))) OpenEditAccountForm(i);
                 ImGui::SameLine();
-                if (ImGui::SmallButton("Delete")) m_confirmDeleteIndex = i;
+                if (ImGui::Button("Delete", ImVec2(62.0f, 26.0f))) m_confirmDeleteIndex = i;
             }
             ImGui::PopID();
         }
         ImGui::EndTable();
     }
+    ImGui::PopStyleVar();
 }
 
 void App::RenderClientsPanel() {
@@ -1113,68 +1210,28 @@ void App::RenderStatusBar() {
     AppThemeColors c = Theme::GetThemeColors(m_settings.darkTheme);
 
     // Unconditionally pin the status bar to the very bottom of the window
-    float statusBarH = ImGui::GetFrameHeightWithSpacing() + 10.0f;
-    float targetY = ImGui::GetWindowHeight() - statusBarH;
+    float statusBarH = ImGui::GetFrameHeight() + 6.0f;
+    float targetY = ImGui::GetWindowHeight() - statusBarH - ImGui::GetStyle().WindowPadding.y;
     if (ImGui::GetCursorPosY() < targetY) {
         ImGui::SetCursorPosY(targetY);
     }
 
-    ImGui::Separator();
-
     ImGui::AlignTextToFramePadding();
+
+    std::string text;
+    ImVec4 color = c.muted;
     if (!m_status.text.empty() && ImGui::GetTime() < m_status.expiryTime) {
-        ImGui::TextColored(m_status.color, "%s", m_status.text.c_str());
-        ImGui::SameLine();
-        ImGui::TextColored(c.muted, "|");
-        ImGui::SameLine();
+        text  = m_status.text;
+        color = m_status.color;
     } else {
-        ImGui::TextColored(c.muted, "Vault: %s  |",
-                           m_vault.IsUnlocked() ? "Unlocked (AES-256-GCM)" : "Locked");
-        ImGui::SameLine();
+        text = m_vault.IsUnlocked() ? "Vault: Unlocked (AES-256-GCM)" : "Vault: Locked";
     }
 
-    ImGui::TextColored(c.muted, "Hotkey:");
-    ImGui::SameLine();
-
-    std::string hkLabel = m_capturingHotkey
-        ? "Press keys... (Esc)"
-        : Hotkey::Format(m_settings.hotkeyMods, m_settings.hotkeyVk);
-    if (ImGui::SmallButton(hkLabel.c_str())) {
-        m_capturingHotkey = true;
-        Hotkey::Unregister(m_hwnd);
-    }
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Click to rebind login hotkey");
-    }
-    if (!m_hotkeyRegistered && !m_capturingHotkey) {
-        ImGui::SameLine();
-        ImGui::TextColored(c.red, "(conflict)");
+    float textW = ImGui::CalcTextSize(text.c_str()).x;
+    float posX  = (ImGui::GetWindowWidth() - textW) * 0.5f;
+    if (posX > ImGui::GetStyle().WindowPadding.x) {
+        ImGui::SetCursorPosX(posX);
     }
 
-    if (m_capturingHotkey) {
-        if (GetAsyncKeyState(VK_ESCAPE) & 0x8000) {
-            m_capturingHotkey  = false;
-            m_hotkeyRegistered = Hotkey::Register(m_hwnd, m_settings.hotkeyMods, m_settings.hotkeyVk);
-        } else {
-            UINT mods = 0;
-            if (GetAsyncKeyState(VK_CONTROL) & 0x8000) mods |= MOD_CONTROL;
-            if (GetAsyncKeyState(VK_SHIFT)   & 0x8000) mods |= MOD_SHIFT;
-            if (GetAsyncKeyState(VK_MENU)    & 0x8000) mods |= MOD_ALT;
-            if ((GetAsyncKeyState(VK_LWIN) | GetAsyncKeyState(VK_RWIN)) & 0x8000) mods |= MOD_WIN;
-
-            for (UINT vk = 0x08; vk <= 0xFE; ++vk) {
-                if (vk == VK_LBUTTON || vk == VK_RBUTTON || vk == VK_MBUTTON ||
-                    vk == VK_XBUTTON1 || vk == VK_XBUTTON2 || vk == VK_ESCAPE ||
-                    Hotkey::IsModifierKey(vk)) continue;
-                if (GetAsyncKeyState((int)vk) & 0x8000) {
-                    m_settings.hotkeyMods = mods;
-                    m_settings.hotkeyVk   = vk;
-                    m_capturingHotkey     = false;
-                    m_hotkeyRegistered    = Hotkey::Register(m_hwnd, m_settings.hotkeyMods, m_settings.hotkeyVk);
-                    SaveSettings();
-                    break;
-                }
-            }
-        }
-    }
+    ImGui::TextColored(color, "%s", text.c_str());
 }
