@@ -125,51 +125,46 @@ bool RenderThemeIconButton(bool darkTheme, const AppThemeColors& c) {
     bool hovered = ImGui::IsItemHovered();
     ImU32 iconCol = ImGui::ColorConvertFloat4ToU32(hovered ? c.accent : c.text);
 
-    // Lightbulb dome
+    // Identical lightbulb silhouette in both themes
     ImVec2 domeC(center.x, center.y - 2.5f);
     float domeR = 4.4f;
 
-    if (!darkTheme) {
-        // Light mode (illuminated bulb with warm glow and radiant rays)
-        ImU32 glowCol = ImColor(255, 200, 40, 255);
-        ImU32 fillCol = ImColor(255, 220, 80, hovered ? 245 : 200);
+    ImVec2 neckP1(center.x - 3.2f, center.y + 0.5f);
+    ImVec2 neckP2(center.x + 3.2f, center.y + 0.5f);
+    ImVec2 neckP3(center.x + 2.0f, center.y + 3.6f);
+    ImVec2 neckP4(center.x - 2.0f, center.y + 3.6f);
 
-        // Glass bulb (circle + neck) filled
-        draw->AddCircleFilled(domeC, domeR, fillCol);
-        ImVec2 neckP1(center.x - 3.2f, center.y + 0.5f);
-        ImVec2 neckP2(center.x + 3.2f, center.y + 0.5f);
-        ImVec2 neckP3(center.x + 2.0f, center.y + 3.6f);
-        ImVec2 neckP4(center.x - 2.0f, center.y + 3.6f);
-        draw->AddQuadFilled(neckP1, neckP2, neckP3, neckP4, fillCol);
+    if (!darkTheme) {
+        // Light theme: bulb is ON (bright warm golden yellow + radiant rays)
+        ImU32 bulbCol = ImColor(255, 215, 60, hovered ? 255 : 220);
+        ImU32 rayCol  = ImColor(255, 195, 30, 255);
+
+        draw->AddCircleFilled(domeC, domeR, bulbCol);
+        draw->AddQuadFilled(neckP1, neckP2, neckP3, neckP4, bulbCol);
 
         // Radiant rays
-        draw->AddLine(ImVec2(center.x, center.y - 8.5f), ImVec2(center.x, center.y - 11.0f), glowCol, 1.6f);
-        draw->AddLine(ImVec2(center.x - 5.5f, center.y - 6.5f), ImVec2(center.x - 7.5f, center.y - 8.5f), glowCol, 1.6f);
-        draw->AddLine(ImVec2(center.x + 5.5f, center.y - 6.5f), ImVec2(center.x + 7.5f, center.y - 8.5f), glowCol, 1.6f);
-        draw->AddLine(ImVec2(center.x - 6.5f, center.y - 2.5f), ImVec2(center.x - 9.0f, center.y - 2.5f), glowCol, 1.6f);
-        draw->AddLine(ImVec2(center.x + 6.5f, center.y - 2.5f), ImVec2(center.x + 9.0f, center.y - 2.5f), glowCol, 1.6f);
-
-        // Screw base
-        draw->AddLine(ImVec2(center.x - 2.0f, center.y + 4.8f), ImVec2(center.x + 2.0f, center.y + 4.8f), iconCol, 1.5f);
-        draw->AddLine(ImVec2(center.x - 1.4f, center.y + 6.2f), ImVec2(center.x + 1.4f, center.y + 6.2f), iconCol, 1.5f);
+        draw->AddLine(ImVec2(center.x, center.y - 8.5f), ImVec2(center.x, center.y - 11.0f), rayCol, 1.6f);
+        draw->AddLine(ImVec2(center.x - 5.5f, center.y - 6.5f), ImVec2(center.x - 7.5f, center.y - 8.5f), rayCol, 1.6f);
+        draw->AddLine(ImVec2(center.x + 5.5f, center.y - 6.5f), ImVec2(center.x + 7.5f, center.y - 8.5f), rayCol, 1.6f);
+        draw->AddLine(ImVec2(center.x - 6.5f, center.y - 2.5f), ImVec2(center.x - 9.0f, center.y - 2.5f), rayCol, 1.6f);
+        draw->AddLine(ImVec2(center.x + 6.5f, center.y - 2.5f), ImVec2(center.x + 9.0f, center.y - 2.5f), rayCol, 1.6f);
     } else {
-        // Dark mode (clean vector bulb outline with filament)
+        // Dark theme: bulb is OFF (dark dim slate glass with crisp outline, no rays)
+        ImU32 darkFill = hovered ? ImColor(95, 105, 125, 230) : ImColor(60, 66, 80, 220);
+
+        draw->AddCircleFilled(domeC, domeR, darkFill);
+        draw->AddQuadFilled(neckP1, neckP2, neckP3, neckP4, darkFill);
+
+        // Clean outer glass contour
         draw->PathArcTo(domeC, domeR, 2.55f, 0.59f, 16);
         draw->PathLineTo(ImVec2(center.x + 2.0f, center.y + 3.6f));
         draw->PathLineTo(ImVec2(center.x - 2.0f, center.y + 3.6f));
-        draw->PathStroke(iconCol, ImDrawFlags_Closed, 1.6f);
-
-        // Filament inside
-        ImU32 filCol = ImGui::ColorConvertFloat4ToU32(hovered ? c.accent : c.amber);
-        draw->AddLine(ImVec2(center.x - 1.5f, center.y + 2.0f), ImVec2(center.x - 0.9f, center.y - 1.5f), filCol, 1.2f);
-        draw->AddLine(ImVec2(center.x - 0.9f, center.y - 1.5f), ImVec2(center.x, center.y - 0.5f), filCol, 1.2f);
-        draw->AddLine(ImVec2(center.x, center.y - 0.5f), ImVec2(center.x + 0.9f, center.y - 1.5f), filCol, 1.2f);
-        draw->AddLine(ImVec2(center.x + 0.9f, center.y - 1.5f), ImVec2(center.x + 1.5f, center.y + 2.0f), filCol, 1.2f);
-
-        // Screw base
-        draw->AddLine(ImVec2(center.x - 2.0f, center.y + 4.8f), ImVec2(center.x + 2.0f, center.y + 4.8f), iconCol, 1.5f);
-        draw->AddLine(ImVec2(center.x - 1.4f, center.y + 6.2f), ImVec2(center.x + 1.4f, center.y + 6.2f), iconCol, 1.5f);
+        draw->PathStroke(iconCol, ImDrawFlags_Closed, 1.4f);
     }
+
+    // Screw base (identical on both)
+    draw->AddLine(ImVec2(center.x - 2.0f, center.y + 4.8f), ImVec2(center.x + 2.0f, center.y + 4.8f), iconCol, 1.5f);
+    draw->AddLine(ImVec2(center.x - 1.4f, center.y + 6.2f), ImVec2(center.x + 1.4f, center.y + 6.2f), iconCol, 1.5f);
 
     return clicked;
 }
@@ -615,14 +610,14 @@ void App::RenderMainScreen() {
     float footerReserve = 34.0f;
     float contentH = ImGui::GetContentRegionAvail().y - footerReserve;
 
-    float bottomH  = 135.0f;
+    float bottomH  = 140.0f;
     float accountsH = std::max(180.0f, contentH - bottomH - ImGui::GetStyle().ItemSpacing.y);
 
     ImGui::BeginChild("AccountsSection", ImVec2(0, accountsH), true);
     RenderAccountsPanel();
     ImGui::EndChild();
 
-    float clientsW = 340.0f;
+    float clientsW = 320.0f;
 
     ImGui::BeginChild("ClientsSection", ImVec2(clientsW, bottomH), true);
     RenderClientsPanel();
@@ -669,12 +664,11 @@ void App::RenderAccountsPanel() {
 
     ImGuiTableFlags tflags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH |
                              ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;
-    if (ImGui::BeginTable("AccountsTable", 5, tflags)) {
+    if (ImGui::BeginTable("AccountsTable", 4, tflags)) {
         ImGui::TableSetupColumn("Active",   ImGuiTableColumnFlags_WidthFixed, 54.0f);
         ImGui::TableSetupColumn("Label",    ImGuiTableColumnFlags_WidthStretch, 1.0f);
-        ImGui::TableSetupColumn("Username", ImGuiTableColumnFlags_WidthStretch, 1.1f);
-        ImGui::TableSetupColumn("Password", ImGuiTableColumnFlags_WidthStretch, 1.1f);
-        ImGui::TableSetupColumn("Actions",  ImGuiTableColumnFlags_WidthFixed, 235.0f);
+        ImGui::TableSetupColumn("Username", ImGuiTableColumnFlags_WidthStretch, 1.2f);
+        ImGui::TableSetupColumn("Actions",  ImGuiTableColumnFlags_WidthFixed, 210.0f);
         ImGui::TableHeadersRow();
 
         int activeIdx = m_vault.ActiveIndex();
@@ -697,18 +691,6 @@ void App::RenderAccountsPanel() {
             ImGui::TextUnformatted(accounts[i].username.c_str());
 
             ImGui::TableSetColumnIndex(3);
-            ImGui::SmallButton("Hold to reveal");
-            if (ImGui::IsItemActive()) {
-                SecureBytes revealed = accounts[i].password.Reveal();
-                ImGui::SameLine();
-                ImGui::TextUnformatted(reinterpret_cast<const char*>(revealed.data()),
-                                       reinterpret_cast<const char*>(revealed.data() + revealed.size()));
-            } else {
-                ImGui::SameLine();
-                ImGui::TextColored(c.muted, "********");
-            }
-
-            ImGui::TableSetColumnIndex(4);
             if (m_confirmDeleteIndex == i) {
                 ImGui::TextColored(c.red, "Delete?");
                 ImGui::SameLine();
@@ -816,44 +798,62 @@ void App::RenderSettingsPanel() {
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("Configure keystroke injection method, sequence, safety checks & delays");
     ImGui::Separator();
 
-    // 1. Hotkey
-    ImGui::AlignTextToFramePadding();
-    ImGui::Text("Login Hotkey:");
-    ImGui::SameLine();
-    std::string hkLabel = m_capturingHotkey
-        ? "Press keys... (Esc)"
-        : Hotkey::Format(m_settings.hotkeyMods, m_settings.hotkeyVk);
-    if (ImGui::Button(hkLabel.c_str())) {
-        m_capturingHotkey = true;
-        Hotkey::Unregister(m_hwnd);
-    }
-    if (!m_hotkeyRegistered && !m_capturingHotkey) {
+    if (ImGui::BeginTable("SettingsLayoutGrid", 2, ImGuiTableFlags_None)) {
+        ImGui::TableSetupColumn("ColLeft",  ImGuiTableColumnFlags_WidthStretch, 0.54f);
+        ImGui::TableSetupColumn("ColRight", ImGuiTableColumnFlags_WidthStretch, 0.46f);
+
+        // ── Row 1 ──
+        ImGui::TableNextRow();
+
+        // Left: Login Hotkey
+        ImGui::TableSetColumnIndex(0);
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Login Hotkey:");
         ImGui::SameLine();
-        ImGui::TextColored(c.red, "(conflict)");
-    }
-
-    // 2. Hide from screen capture
-    if (ImGui::Checkbox("Hide from screen capture", &m_settings.hideFromCapture)) {
-        ApplySettingsToSystem();
-        SaveSettings();
-    }
-
-    // 3. Auto-lock vault
-    bool autoLockEnabled = (m_settings.autoLockMinutes > 0);
-    if (ImGui::Checkbox("Auto-lock vault", &autoLockEnabled)) {
-        if (autoLockEnabled) {
-            m_settings.autoLockMinutes = 15;
-        } else {
-            m_settings.autoLockMinutes = 0;
+        std::string hkLabel = m_capturingHotkey
+            ? "Press keys... (Esc)"
+            : Hotkey::Format(m_settings.hotkeyMods, m_settings.hotkeyVk);
+        if (ImGui::Button(hkLabel.c_str())) {
+            m_capturingHotkey = true;
+            Hotkey::Unregister(m_hwnd);
         }
-        SaveSettings();
-    }
-    if (autoLockEnabled) {
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(100.0f);
-        if (ImGui::SliderInt("##auto_lock_val", &m_settings.autoLockMinutes, 1, 60, "%d min")) {
+        if (!m_hotkeyRegistered && !m_capturingHotkey) {
+            ImGui::SameLine();
+            ImGui::TextColored(c.red, "(conflict)");
+        }
+
+        // Right: Hide from screen capture
+        ImGui::TableSetColumnIndex(1);
+        ImGui::AlignTextToFramePadding();
+        if (ImGui::Checkbox("Hide from screen capture", &m_settings.hideFromCapture)) {
+            ApplySettingsToSystem();
             SaveSettings();
         }
+
+        // ── Row 2 ──
+        ImGui::TableNextRow();
+
+        // Left: Auto-lock vault
+        ImGui::TableSetColumnIndex(0);
+        ImGui::AlignTextToFramePadding();
+        bool autoLockEnabled = (m_settings.autoLockMinutes > 0);
+        if (ImGui::Checkbox("Auto-lock vault", &autoLockEnabled)) {
+            if (autoLockEnabled) {
+                m_settings.autoLockMinutes = 15;
+            } else {
+                m_settings.autoLockMinutes = 0;
+            }
+            SaveSettings();
+        }
+        if (autoLockEnabled) {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(85.0f);
+            if (ImGui::SliderInt("##auto_lock_val", &m_settings.autoLockMinutes, 1, 60, "%d min")) {
+                SaveSettings();
+            }
+        }
+
+        ImGui::EndTable();
     }
 
     if (m_capturingHotkey) {
