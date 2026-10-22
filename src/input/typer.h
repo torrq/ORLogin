@@ -15,19 +15,20 @@
 #include "settings.h"
 
 struct TyperJob {
-    HWND            hwnd         = nullptr;
+    HWND            hwnd          = nullptr;
+    DWORD           targetPid     = 0;
     std::string     username;
     SecureBytes     password;    // wiped immediately when the worker exits
-    LoginSequence   sequence     = LoginSequence::IdTabPassword;
-    LoginFieldFocus currentFocus = LoginFieldFocus::Unknown;
-    bool            clearIdField = true;
-    bool            pressEnter   = true;
-    InputMethod     method       = InputMethod::PostMessage;
-    int             keyDelayMs   = 15;
-    int             enterDelayMs = 200;
-    int             tabDelayMs   = 25;
-    int             clearDelayMs = 3;
-    int             keyHoldMs    = 10;
+    LoginSequence   sequence      = LoginSequence::IdTabPassword;
+    LoginFieldFocus currentFocus  = LoginFieldFocus::Unknown;
+    bool            clearIdField  = true;
+    bool            pressEnter    = true;
+    InputMethod     method        = InputMethod::PostMessage;
+    int             keyDelayMs    = 15;
+    int             enterDelayMs  = 200;
+    int             tabDelayMs    = 25;
+    int             clearDelayMs  = 3;
+    int             keyHoldMs     = 10;
 };
 
 class Typer {

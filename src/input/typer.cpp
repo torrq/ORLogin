@@ -53,8 +53,26 @@ void SendInputKeyTap(UINT vk, int holdMs) {
     in[1].ki.dwFlags = KEYEVENTF_KEYUP;
 
     SendInput(1, &in[0], sizeof(INPUT));
+
+    // Also send hardware scancode event for DirectX / DirectInput / GetAsyncKeyState
+    if (scan != 0) {
+        INPUT inScan[1] = {};
+        inScan[0].type       = INPUT_KEYBOARD;
+        inScan[0].ki.wScan   = static_cast<WORD>(scan);
+        inScan[0].ki.dwFlags = KEYEVENTF_SCANCODE;
+        SendInput(1, &inScan[0], sizeof(INPUT));
+    }
+
     if (holdMs > 0) Sleep(holdMs);
+
     SendInput(1, &in[1], sizeof(INPUT));
+    if (scan != 0) {
+        INPUT inScan[1] = {};
+        inScan[0].type       = INPUT_KEYBOARD;
+        inScan[0].ki.wScan   = static_cast<WORD>(scan);
+        inScan[0].ki.dwFlags = KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP;
+        SendInput(1, &inScan[0], sizeof(INPUT));
+    }
 }
 
 void SendInputCharUnit(wchar_t ch, int holdMs) {
@@ -201,15 +219,70 @@ void Typer::Run(TyperJob job, std::atomic<bool>* busyFlag) {
     TypeBytes(job.hwnd, job.method, job.password.data(), job.password.size(), delay);
 
     if (job.pressEnter) {
+        // Ensure game window is in foreground so dialogs and hardware input are active
+        if (job.hwnd && IsWindow(job.hwnd)) {
+            SetForegroundWindow(job.hwnd);
+        }
+
         // First Return submits username and password
         Sleep(std::max(delay, 20));
         TapKey(job.hwnd, job.method, VK_RETURN, 20, hold);
 
-        // Configured pause between returns (default 200ms)
+        // Pause for server network roundtrip (default 200ms)
         int pauseMs = std::clamp(job.enterDelayMs, 20, 1000);
         Sleep(pauseMs);
 
-        // Second Return confirms Service/Server selection and enters Char Select
-        TapKey(job.hwnd, job.method, VK_RETURN, 20, hold);
+        // Open client process handle to check for Character Select transition (UiFlag == 1 at 0x00F33F90)
+        HANDLE hProcess = nullptr;
+        if (job.targetPid != 0) {
+            hProcess = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, job.targetPid);
+            if (!hProcess) hProcess = OpenProcess(PROCESS_VM_READ, FALSE, job.targetPid);
+        }
+
+        auto HasReachedCharSelect = [hProcess]() -> bool {
+            if (!hProcess) return false;
+            uint32_t uiFlag = 0;
+            SIZE_T read = 0;
+            if (ReadProcessMemory(hProcess, reinterpret_cast<LPCVOID>(0x00F33F90), &uiFlag, 4, &read) && read == 4) {
+                return (uiFlag == 1);
+            }
+            return false;
+        };
+
+        // If client already transitioned to Character Select, nothing more to send
+        if (!HasReachedCharSelect()) {
+            // Second Return confirms Service/Server selection and enters Char Select.
+            // Since network round-trip time varies, we pulse spaced returns until the client
+            // confirms and transitions into Character Select (or max timeout is reached).
+            const int maxAttempts = (hProcess != nullptr) ? 7 : 2;
+            const int pollStepMs  = 140;
+
+            for (int attempt = 0; attempt < maxAttempts; ++attempt) {
+                if (!IsWindow(job.hwnd)) break;
+
+                // Bring to foreground if focus shifted
+                if (GetForegroundWindow() != job.hwnd) {
+                    SetForegroundWindow(job.hwnd);
+                }
+
+                // Dispatch via both hardware SendInput (updates GetAsyncKeyState/DirectInput)
+                // and PostMessage (window message queue)
+                SendInputKeyTap(VK_RETURN, hold);
+                PostKeyTap(job.hwnd, VK_RETURN, hold);
+
+                // Wait and poll for state transition
+                bool transitioned = false;
+                for (int elapsed = 0; elapsed < pollStepMs; elapsed += 25) {
+                    Sleep(25);
+                    if (HasReachedCharSelect()) {
+                        transitioned = true;
+                        break;
+                    }
+                }
+                if (transitioned) break;
+            }
+        }
+
+        if (hProcess) CloseHandle(hProcess);
     }
 }

@@ -261,6 +261,7 @@ void App::OnHotkey() {
     const Account& acc = accounts[activeIdx];
     TyperJob job;
     job.hwnd         = target->hwnd;
+    job.targetPid    = target->pid;
     job.username     = acc.username;
     job.password     = acc.password.Reveal();
     job.sequence     = m_settings.sequence;
@@ -562,16 +563,17 @@ void App::RenderAccountsPanel() {
         ImGui::InputTextWithHint("##acc_label", "Label (optional)", m_labelBuf, sizeof(m_labelBuf));
         ImGui::SameLine();
         ImGui::SetNextItemWidth(fieldW);
-        ImGui::InputTextWithHint("##acc_user", "Username / ID", m_userBuf, sizeof(m_userBuf));
+        bool userSubmit = ImGui::InputTextWithHint("##acc_user", "Username / ID", m_userBuf, sizeof(m_userBuf),
+                                                   ImGuiInputTextFlags_EnterReturnsTrue);
         ImGui::SameLine();
         ImGui::SetNextItemWidth(fieldW);
-        ImGuiInputTextFlags pf = ImGuiInputTextFlags_NoUndoRedo |
+        ImGuiInputTextFlags pf = ImGuiInputTextFlags_NoUndoRedo | ImGuiInputTextFlags_EnterReturnsTrue |
                                  (m_showAccPw ? ImGuiInputTextFlags_None : ImGuiInputTextFlags_Password);
-        ImGui::InputTextWithHint("##acc_pw", "Password", reinterpret_cast<char*>(m_accPwBuf.data()), m_accPwBuf.size(), pf);
+        bool pwSubmit = ImGui::InputTextWithHint("##acc_pw", "Password", reinterpret_cast<char*>(m_accPwBuf.data()), m_accPwBuf.size(), pf);
 
         ImGui::Checkbox("Show password", &m_showAccPw);
         ImGui::SameLine();
-        if (PrimaryButton("Save Account", c)) {
+        if (PrimaryButton("Save Account", c) || userSubmit || pwSubmit) {
             SecureBytes pw = SecureFromEditBuffer(m_accPwBuf);
             if (std::strlen(m_userBuf) == 0) {
                 FlashStatus("Username cannot be empty", c.red);
@@ -877,10 +879,11 @@ void App::RenderChangeMasterModal() {
 
         ImGui::Text("Confirm New Master Password");
         ImGui::SetNextItemWidth(-1);
-        ImGui::InputText("##new_mp2", reinterpret_cast<char*>(m_pwBuf3.data()), m_pwBuf3.size(), pf);
+        bool mpSubmit = ImGui::InputText("##new_mp2", reinterpret_cast<char*>(m_pwBuf3.data()), m_pwBuf3.size(),
+                                         pf | ImGuiInputTextFlags_EnterReturnsTrue);
 
         ImGui::Spacing();
-        if (PrimaryButton("Update Master Password", c)) {
+        if (PrimaryButton("Update Master Password", c) || mpSubmit) {
             SecureBytes cur = SecureFromEditBuffer(m_pwBuf1);
             SecureBytes n1  = SecureFromEditBuffer(m_pwBuf2);
             SecureBytes n2  = SecureFromEditBuffer(m_pwBuf3);
