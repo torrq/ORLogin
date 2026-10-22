@@ -42,6 +42,7 @@ private:
     void RenderClientsPanel();
     void RenderSettingsPanel();
     void RenderChangeMasterModal();
+    void RenderAdvancedSettingsModal();
     void RenderStatusBar();
 
     void ApplySettingsToSystem();
@@ -84,6 +85,9 @@ private:
 
     // Change master password modal
     bool m_changeMasterOpen = false;
+
+    // Advanced timing settings modal
+    bool m_advancedSettingsOpen = false;
 
     // Hotkey capture state
     bool m_capturingHotkey = false;

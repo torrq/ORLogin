@@ -29,6 +29,9 @@ void WaitUntilModifiersReleased(int maxWaitMs = 600) {
 
 void PostKeyTap(HWND hwnd, UINT vk, int holdMs) {
     PostMessageW(hwnd, WM_KEYDOWN, vk, MakeKeyLParam(vk, true));
+    if (vk == VK_RETURN) {
+        PostMessageW(hwnd, WM_CHAR, VK_RETURN, MakeKeyLParam(vk, true));
+    }
     if (holdMs > 0) Sleep(holdMs);
     PostMessageW(hwnd, WM_KEYUP, vk, MakeKeyLParam(vk, false));
 }
@@ -101,8 +104,8 @@ void SendInputCharUnit(wchar_t ch, int holdMs) {
     }
 }
 
-void TapKey(HWND hwnd, InputMethod method, UINT vk, int delayMs) {
-    int hold = std::clamp(delayMs / 2, 5, 25);
+void TapKey(HWND hwnd, InputMethod method, UINT vk, int delayMs, int holdMs = 0) {
+    int hold = (holdMs > 0) ? holdMs : std::clamp(delayMs / 2, 5, 25);
     if (method == InputMethod::PostMessage) PostKeyTap(hwnd, vk, hold);
     else                                    SendInputKeyTap(vk, hold);
     if (delayMs > 0) Sleep(delayMs);
@@ -125,15 +128,15 @@ void TypeBytes(HWND hwnd, InputMethod method, const uint8_t* data, size_t len, i
     }
 }
 
-void ClearField(HWND hwnd, InputMethod method, int delayMs) {
+void ClearField(HWND hwnd, InputMethod method, int clearDelayMs, int holdMs) {
     // Move to the end of the text box and erase up to 24 characters (RO account limit).
-    int fastDelay = std::min(delayMs, 4);
-    TapKey(hwnd, method, VK_END, fastDelay);
+    int fastDelay = std::clamp(clearDelayMs, 1, 20);
+    TapKey(hwnd, method, VK_END, fastDelay, holdMs);
     for (int i = 0; i < 24; ++i) {
         if (!IsWindow(hwnd)) return;
         if (method == InputMethod::PostMessage) PostKeyTap(hwnd, VK_BACK, 1);
         else                                    SendInputKeyTap(VK_BACK, 1);
-        Sleep(2);
+        if (fastDelay > 0) Sleep(fastDelay);
     }
     Sleep(10);
 }
@@ -173,25 +176,25 @@ void Typer::Run(TyperJob job, std::atomic<bool>* busyFlag) {
     WaitUntilModifiersReleased();
 
     int delay = std::clamp(job.keyDelayMs, 1, 200);
+    int hold  = std::clamp(job.keyHoldMs, 1, 100);
+    int tabD  = std::clamp(job.tabDelayMs, 1, 500);
 
     if (job.sequence == LoginSequence::IdTabPassword) {
         // Auto-align: if client is currently focused on the Password field,
         // send Tab first to cycle focus to the User ID field before typing.
         if (job.currentFocus == LoginFieldFocus::Password) {
-            TapKey(job.hwnd, job.method, VK_TAB, std::max(delay, 25));
-            Sleep(25);
+            TapKey(job.hwnd, job.method, VK_TAB, tabD, hold);
         }
-        if (job.clearIdField) ClearField(job.hwnd, job.method, delay);
+        if (job.clearIdField) ClearField(job.hwnd, job.method, job.clearDelayMs, hold);
         TypeBytes(job.hwnd, job.method,
                   reinterpret_cast<const uint8_t*>(job.username.data()), job.username.size(),
                   delay);
-        TapKey(job.hwnd, job.method, VK_TAB, std::max(delay, 20));
+        TapKey(job.hwnd, job.method, VK_TAB, tabD, hold);
     } else if (job.sequence == LoginSequence::PasswordOnly) {
         // Auto-align: if client is currently focused on User ID,
         // send Tab first to cycle focus to the Password field.
         if (job.currentFocus == LoginFieldFocus::UserId) {
-            TapKey(job.hwnd, job.method, VK_TAB, std::max(delay, 25));
-            Sleep(25);
+            TapKey(job.hwnd, job.method, VK_TAB, tabD, hold);
         }
     }
 
@@ -199,11 +202,14 @@ void Typer::Run(TyperJob job, std::atomic<bool>* busyFlag) {
 
     if (job.pressEnter) {
         // First Return submits username and password
-        Sleep(std::max(delay, 25));
-        TapKey(job.hwnd, job.method, VK_RETURN, std::max(delay, 20));
+        Sleep(std::max(delay, 20));
+        TapKey(job.hwnd, job.method, VK_RETURN, 20, hold);
 
-        // Slight pause, then second Return to select service/server and proceed to Char Select
-        Sleep(150);
-        TapKey(job.hwnd, job.method, VK_RETURN, std::max(delay, 20));
+        // Configured pause between returns (default 200ms)
+        int pauseMs = std::clamp(job.enterDelayMs, 20, 1000);
+        Sleep(pauseMs);
+
+        // Second Return confirms Service/Server selection and enters Char Select
+        TapKey(job.hwnd, job.method, VK_RETURN, 20, hold);
     }
 }

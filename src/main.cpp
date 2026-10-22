@@ -99,8 +99,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
-        840,
-        640,
+        880,
+        720,
         nullptr,
         nullptr,
         wc.hInstance,
@@ -148,7 +148,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     };
     for (const char* path : fontCandidates) {
         if (GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) {
-            loadedFont = io.Fonts->AddFontFromFileTTF(path, 16.0f, &fontCfg, glyphRanges);
+            loadedFont = io.Fonts->AddFontFromFileTTF(path, 18.0f, &fontCfg, glyphRanges);
             if (loadedFont) break;
         }
     }

@@ -25,6 +25,10 @@ struct Settings {
     bool          pressEnter         = true;
     InputMethod   inputMethod        = InputMethod::PostMessage;
     int           keyDelayMs         = 15;
+    int           enterDelayMs       = 200;  // pause between 1st Return and 2nd Return (ms)
+    int           tabDelayMs         = 25;   // pause after Tab key focus transition (ms)
+    int           clearDelayMs       = 3;    // delay between backspaces when clearing ID field (ms)
+    int           keyHoldMs          = 10;   // key down hold duration before release (ms)
     int           autoLockMinutes    = 15;   // 0 = never
     bool          requireLoginScreen = true; // refuse to type into an in-game client
     bool          hideFromCapture    = false;// exclude ORLogin's window from screenshots/streams

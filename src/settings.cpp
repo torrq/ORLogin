@@ -23,8 +23,12 @@ Settings Load(const std::filesystem::path& path) {
     s.sequence           = j.value("sequence", 0) == 1 ? LoginSequence::PasswordOnly : LoginSequence::IdTabPassword;
     s.clearIdField       = j.value("clearIdField", s.clearIdField);
     s.pressEnter         = j.value("pressEnter", s.pressEnter);
+    s.enterDelayMs       = std::clamp(j.value("enterDelayMs", s.enterDelayMs), 20, 1000);
     s.inputMethod        = j.value("inputMethod", 0) == 1 ? InputMethod::SendInput : InputMethod::PostMessage;
     s.keyDelayMs         = std::clamp(j.value("keyDelayMs", s.keyDelayMs), 1, 200);
+    s.tabDelayMs         = std::clamp(j.value("tabDelayMs", s.tabDelayMs), 5, 500);
+    s.clearDelayMs       = std::clamp(j.value("clearDelayMs", s.clearDelayMs), 1, 50);
+    s.keyHoldMs          = std::clamp(j.value("keyHoldMs", s.keyHoldMs), 2, 100);
     s.autoLockMinutes    = std::clamp(j.value("autoLockMinutes", s.autoLockMinutes), 0, 240);
     s.requireLoginScreen = j.value("requireLoginScreen", s.requireLoginScreen);
     s.hideFromCapture    = j.value("hideFromCapture", s.hideFromCapture);
@@ -42,8 +46,12 @@ bool Save(const std::filesystem::path& path, const Settings& s) {
     j["sequence"]           = (int)s.sequence;
     j["clearIdField"]       = s.clearIdField;
     j["pressEnter"]         = s.pressEnter;
+    j["enterDelayMs"]       = s.enterDelayMs;
     j["inputMethod"]        = (int)s.inputMethod;
     j["keyDelayMs"]         = s.keyDelayMs;
+    j["tabDelayMs"]         = s.tabDelayMs;
+    j["clearDelayMs"]       = s.clearDelayMs;
+    j["keyHoldMs"]          = s.keyHoldMs;
     j["autoLockMinutes"]    = s.autoLockMinutes;
     j["requireLoginScreen"] = s.requireLoginScreen;
     j["hideFromCapture"]    = s.hideFromCapture;

@@ -52,7 +52,7 @@ bool PrimaryButton(const char* label, const AppThemeColors& c, ImVec2 size = ImV
 }
 
 bool RenderLockIconButton(const AppThemeColors& c) {
-    ImVec2 size(32.0f, 26.0f);
+    ImVec2 size(34.0f, 28.0f);
     ImGui::PushStyleColor(ImGuiCol_Button, c.panel);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, c.panelHover);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, c.borderBright);
@@ -267,6 +267,10 @@ void App::OnHotkey() {
     job.currentFocus = target->loginFocus;
     job.clearIdField = m_settings.clearIdField;
     job.pressEnter   = m_settings.pressEnter;
+    job.enterDelayMs = m_settings.enterDelayMs;
+    job.tabDelayMs   = m_settings.tabDelayMs;
+    job.clearDelayMs = m_settings.clearDelayMs;
+    job.keyHoldMs    = m_settings.keyHoldMs;
     job.method       = m_settings.inputMethod;
     job.keyDelayMs   = m_settings.keyDelayMs;
 
@@ -336,7 +340,7 @@ void App::RenderHeader() {
     const char* themeLabel = m_settings.darkTheme ? "Light Theme" : "Dark Theme";
     float rightWidth = ImGui::CalcTextSize(themeLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
     if (m_vault.IsUnlocked()) {
-        rightWidth += 32.0f + ImGui::GetStyle().ItemSpacing.x; // Lock icon button width
+        rightWidth += 34.0f + ImGui::GetStyle().ItemSpacing.x; // Lock icon button width
         rightWidth += ImGui::CalcTextSize("Master Password").x + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetStyle().ItemSpacing.x;
     }
 
@@ -503,13 +507,13 @@ void App::RenderMainScreen() {
     float footerReserve = 34.0f;
     float contentH = ImGui::GetContentRegionAvail().y - footerReserve;
 
-    float accountsH = std::max(180.0f, contentH * 0.48f);
+    float accountsH = std::clamp(contentH * 0.40f, 150.0f, 210.0f);
     ImGui::BeginChild("AccountsSection", ImVec2(0, accountsH), true);
     RenderAccountsPanel();
     ImGui::EndChild();
 
-    float bottomH  = std::max(160.0f, ImGui::GetContentRegionAvail().y - footerReserve);
-    float clientsW = 310.0f;
+    float bottomH  = std::max(180.0f, ImGui::GetContentRegionAvail().y - footerReserve);
+    float clientsW = 320.0f;
 
     ImGui::BeginChild("ClientsSection", ImVec2(clientsW, bottomH), true);
     RenderClientsPanel();
@@ -522,6 +526,7 @@ void App::RenderMainScreen() {
     ImGui::EndChild();
 
     RenderChangeMasterModal();
+    RenderAdvancedSettingsModal();
 }
 
 void App::RenderAccountsPanel() {
@@ -614,7 +619,7 @@ void App::RenderAccountsPanel() {
         ImGui::TableSetupColumn("Label",    ImGuiTableColumnFlags_WidthStretch, 1.0f);
         ImGui::TableSetupColumn("Username", ImGuiTableColumnFlags_WidthStretch, 1.1f);
         ImGui::TableSetupColumn("Password", ImGuiTableColumnFlags_WidthStretch, 1.1f);
-        ImGui::TableSetupColumn("Actions",  ImGuiTableColumnFlags_WidthFixed, 220.0f);
+        ImGui::TableSetupColumn("Actions",  ImGuiTableColumnFlags_WidthFixed, 235.0f);
         ImGui::TableHeadersRow();
 
         int activeIdx = m_vault.ActiveIndex();
@@ -736,7 +741,19 @@ void App::RenderClientsPanel() {
 void App::RenderSettingsPanel() {
     AppThemeColors c = Theme::GetThemeColors(m_settings.darkTheme);
 
+    ImGui::AlignTextToFramePadding();
     ImGui::TextColored(c.accent, "Hotkey & Login Behavior");
+    ImGui::SameLine();
+
+    float advW = ImGui::CalcTextSize("Advanced...").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    float avail = ImGui::GetContentRegionAvail().x;
+    if (avail > advW) ImGui::SameLine(ImGui::GetCursorPosX() + avail - advW);
+    else              ImGui::SameLine();
+
+    if (ImGui::Button("Advanced...")) {
+        m_advancedSettingsOpen = true;
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Redefine specific keystroke & transition delays");
     ImGui::Separator();
 
     if (ImGui::BeginTable("SettingsLayoutGrid", 2, ImGuiTableFlags_None)) {
@@ -759,17 +776,20 @@ void App::RenderSettingsPanel() {
             Hotkey::Unregister(m_hwnd);
         }
         if (!m_hotkeyRegistered && !m_capturingHotkey) {
-            ImGui::TextColored(c.red, "Hotkey conflict (in use)");
+            ImGui::SameLine();
+            ImGui::TextColored(c.red, "(conflict)");
         }
 
-        ImGui::Spacing();
-        ImGui::TextColored(c.muted, "Login Sequence:");
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextColored(c.muted, "Sequence:");
+        ImGui::SameLine();
         int seq = (int)m_settings.sequence;
-        if (ImGui::RadioButton("ID + Tab + Password", &seq, 0)) {
+        if (ImGui::RadioButton("ID + Pass", &seq, 0)) {
             m_settings.sequence = LoginSequence::IdTabPassword;
             SaveSettings();
         }
-        if (ImGui::RadioButton("Password only (Save ID)", &seq, 1)) {
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Pass only", &seq, 1)) {
             m_settings.sequence = LoginSequence::PasswordOnly;
             SaveSettings();
         }
@@ -805,11 +825,7 @@ void App::RenderSettingsPanel() {
             SaveSettings();
         }
 
-        ImGui::Spacing();
-        ImGui::SetNextItemWidth(100.0f);
-        if (ImGui::SliderInt("Key delay (ms)", &m_settings.keyDelayMs, 5, 60)) SaveSettings();
-
-        ImGui::SetNextItemWidth(100.0f);
+        ImGui::SetNextItemWidth(90.0f);
         if (ImGui::SliderInt("Auto-lock (min)", &m_settings.autoLockMinutes, 0, 60)) SaveSettings();
 
         ImGui::EndTable();
@@ -894,8 +910,88 @@ void App::RenderChangeMasterModal() {
     }
 }
 
+void App::RenderAdvancedSettingsModal() {
+    if (m_advancedSettingsOpen) {
+        ImGui::OpenPopup("Advanced Settings");
+    }
+    AppThemeColors c = Theme::GetThemeColors(m_settings.darkTheme);
+
+    ImGui::SetNextWindowSize(ImVec2(520, 500), ImGuiCond_Always);
+    if (ImGui::BeginPopupModal("Advanced Settings", &m_advancedSettingsOpen, ImGuiWindowFlags_NoResize)) {
+        ImGui::TextColored(c.accent, "Timing & Delay Configuration");
+        ImGui::TextWrapped("Redefine specific millisecond delays for keystroke injection, field navigation, and server prompts.");
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::Text("Character Typing Delay");
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::SliderInt("##adv_key_delay", &m_settings.keyDelayMs, 1, 60, "%d ms")) SaveSettings();
+        ImGui::TextColored(c.muted, "Delay between typed characters (default: 15 ms).");
+        ImGui::Spacing();
+
+        ImGui::Text("Double-Enter Pause");
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::SliderInt("##adv_enter_delay", &m_settings.enterDelayMs, 20, 1000, "%d ms")) SaveSettings();
+        ImGui::TextColored(c.muted, "Pause between 1st Return (submit credentials) and 2nd Return (select server). Default: 200 ms.");
+        ImGui::Spacing();
+
+        ImGui::Text("Tab Switch Delay");
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::SliderInt("##adv_tab_delay", &m_settings.tabDelayMs, 5, 200, "%d ms")) SaveSettings();
+        ImGui::TextColored(c.muted, "Pause after Tab field-switch and focus auto-alignment (default: 25 ms).");
+        ImGui::Spacing();
+
+        ImGui::Text("Field Clear Backspace Delay");
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::SliderInt("##adv_clear_delay", &m_settings.clearDelayMs, 1, 30, "%d ms")) SaveSettings();
+        ImGui::TextColored(c.muted, "Delay between backspaces when erasing the ID field (default: 3 ms).");
+        ImGui::Spacing();
+
+        ImGui::Text("Hardware Key Hold Duration");
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::SliderInt("##adv_hold_delay", &m_settings.keyHoldMs, 2, 50, "%d ms")) SaveSettings();
+        ImGui::TextColored(c.muted, "Key-down hold duration before key-up release (default: 10 ms).");
+        ImGui::Spacing();
+
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        if (ImGui::Button("Reset to Defaults")) {
+            m_settings.keyDelayMs   = 15;
+            m_settings.enterDelayMs = 200;
+            m_settings.tabDelayMs   = 25;
+            m_settings.clearDelayMs = 3;
+            m_settings.keyHoldMs    = 10;
+            SaveSettings();
+            FlashStatus("Timing delays reset to defaults", c.green);
+        }
+        ImGui::SameLine();
+        float closeW = ImGui::CalcTextSize("Save & Close").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+        float avail = ImGui::GetContentRegionAvail().x;
+        if (avail > closeW) ImGui::SameLine(ImGui::GetCursorPosX() + avail - closeW);
+
+        if (PrimaryButton("Save & Close", c)) {
+            SaveSettings();
+            m_advancedSettingsOpen = false;
+            ImGui::CloseCurrentPopup();
+            FlashStatus("Advanced timing settings saved", c.green);
+        }
+
+        ImGui::EndPopup();
+    }
+}
+
 void App::RenderStatusBar() {
     AppThemeColors c = Theme::GetThemeColors(m_settings.darkTheme);
+
+    // Unconditionally pin the status bar to the very bottom of the window
+    float statusBarH = ImGui::GetFrameHeightWithSpacing() + 10.0f;
+    float targetY = ImGui::GetWindowHeight() - statusBarH;
+    if (ImGui::GetCursorPosY() < targetY) {
+        ImGui::SetCursorPosY(targetY);
+    }
+
     ImGui::Separator();
 
     if (!m_status.text.empty() && ImGui::GetTime() < m_status.expiryTime) {

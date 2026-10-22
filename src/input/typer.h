@@ -24,6 +24,10 @@ struct TyperJob {
     bool            pressEnter   = true;
     InputMethod     method       = InputMethod::PostMessage;
     int             keyDelayMs   = 15;
+    int             enterDelayMs = 200;
+    int             tabDelayMs   = 25;
+    int             clearDelayMs = 3;
+    int             keyHoldMs    = 10;
 };
 
 class Typer {

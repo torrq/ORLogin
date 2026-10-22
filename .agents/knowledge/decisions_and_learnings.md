@@ -65,3 +65,18 @@ This document records the architectural choices, reverse-engineering discoveries
 ### 3.3 Vector UI Icons
 - **Decision**: In place of raster image assets or heavy font icon sets (e.g. FontAwesome), interactive icons (such as the Vault Lock padlock) are rendered procedurally via `ImDrawList` primitives. This ensures crisp vector scaling at any DPI, zero external file dependencies, and interactive theme/hover state color shifts.
 
+### 3.4 Bottom-Anchored Status Bar Invariant
+- **Context**: On screens with compact content (e.g. Vault Creation, Vault Unlocking), the status bar floated directly under the card in the upper-middle of the window.
+- **Decision**: In `RenderStatusBar`, calculate `targetY = GetWindowHeight() - statusBarH`. If `GetCursorPosY() < targetY`, explicitly assign `SetCursorPosY(targetY)` so the status bar is anchored to the window bottom across all application states.
+
+### 3.5 Advanced Timing Modal & Key Injection Polish
+- **Decision**: Rather than cluttering the primary UI with multiple timing sliders, standard delays are housed in a dedicated `Advanced Settings` modal accessible via `[ Advanced... ]` in the settings header.
+- **Configurable Delays**:
+  - `keyDelayMs` (1-60 ms, def 15 ms): Character typing speed.
+  - `enterDelayMs` (20-1000 ms, def 200 ms): Pause between 1st Return (credentials) and 2nd Return (server select).
+  - `tabDelayMs` (5-200 ms, def 25 ms): Pause after Tab field switching and auto-alignment.
+  - `clearDelayMs` (1-30 ms, def 3 ms): Backspace speed when wiping the ID field.
+  - `keyHoldMs` (2-50 ms, def 10 ms): Hardware key-down hold duration before key-up.
+- **Keystroke Synthesis**: For `VK_RETURN`, `PostMessage` dispatches both `WM_KEYDOWN` and `WM_CHAR` (`0x0D`), ensuring modal dialogs that consume character events process the Enter key reliably.
+
+

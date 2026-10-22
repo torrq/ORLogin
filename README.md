@@ -22,7 +22,8 @@ A secure, high-performance login helper for **Oldschool Ragnarok Online (OSRO)**
 - **Flexible Login Sequences & Focus Alignment**:
   - `ID + Tab + Password + Enter x2` (with optional automatic ID field clearing via `VK_END` + 24x `VK_BACK`).
   - **Memory Focus Auto-Alignment**: Reads live input focus (`0x0107A13C`); if the client has the Password field focused, automatically sends a <kbd>Tab</kbd> to align back to User ID before typing.
-  - **Double Return Sequence**: Hits Return twice with a 150ms pause to submit credentials and immediately select the server prompt, taking you directly to Character Select.
+  - **Double Return Sequence**: Hits Return twice (with accompanying `WM_CHAR` and configurable pause) to submit credentials and immediately select the server prompt, taking you directly to Character Select.
+  - **Advanced Timing Configuration**: Dedicated modal to fine-tune individual delays (character typing, double-Enter pause, Tab focus switch, field clear backspace, and hardware hold duration).
   - `Password only + Enter x2` (for users leveraging the client's native "Save ID" option).
   - Supports both queue-based `PostMessageW` (works unfocused) and hardware `SendInput` methods with configurable key delays.
 - **Modern Themes & Native Typography**:
