@@ -28,7 +28,7 @@ public:
     void OnSessionLock();
     bool HandleCloseRequest(HWND hwnd);
 
-    const char* GetWindowTitle() const { return "ORLogin - OSRO Highrate Login Helper"; }
+    const char* GetWindowTitle() const { return "OSRO Login Helper"; }
     bool IsDarkTheme() const { return m_settings.darkTheme; }
 
     void FlashStatus(const std::string& msg, ImVec4 color);

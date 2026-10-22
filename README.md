@@ -1,6 +1,6 @@
-# ORLogin
+# OSRO Login Helper (ORLogin)
 
-A secure, high-performance login helper for **Oldschool Ragnarok Online (OSRO)**, built specifically for OSRO Highrate.
+A secure, high-performance login helper for **Oldschool Ragnarok Online (OSRO)**, built specifically for Highrate (and Midrate).
 
 ---
 
@@ -23,11 +23,13 @@ A secure, high-performance login helper for **Oldschool Ragnarok Online (OSRO)**
   - `ID + Tab + Password + Enter` (with optional automatic ID field clearing via `VK_END` + 24x `VK_BACK`).
   - `Password only + Enter` (for users leveraging the client's native "Save ID" option).
   - Supports both queue-based `PostMessageW` (works unfocused) and hardware `SendInput` methods with configurable key delays.
-- **Dark & Light Themes**:
-  - Instant toggle button supporting a custom Emerald & Mint dark theme and paper light theme.
+- **Modern Themes & Native Typography**:
+  - Instant toggle button supporting a high-contrast Obsidian & Cyan dark theme and clean Studio paper light theme.
+  - Full UTF-8 and CP-1252 symbol coverage (including `™` Trademark sign in character names) rendered with Windows Segoe UI.
   - Integrates with Windows 10/11 immersive title bar dark mode.
 - **Privacy & Workstation Security**:
   - Automatically locks the vault and purges keys from RAM when your Windows session locks (`WTS_SESSION_LOCK` / `Win + L`).
+  - One-click vector padlock icon to instantly lock the vault.
   - Configurable idle auto-lock timer.
   - Optional window display protection (`WDA_EXCLUDEFROMCAPTURE`) to prevent screen capture / streaming leaks on OBS and Discord.
   - Progressive rate-limiting delay on failed master password attempts.

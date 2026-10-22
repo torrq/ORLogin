@@ -34,3 +34,25 @@ This document records the architectural choices, reverse-engineering discoveries
 - **In-Memory**: Non-pageable `VirtualAlloc(PAGE_READWRITE)` + `VirtualLock` pages wrapped in DPAPI `CryptProtectMemory`. Plaintext is only exposed in RAM for the few milliseconds required during typing, then wiped via RAII guard with `SecureZeroMemory`.
 - **Session Auto-Lock**: `WM_WTSSESSION_CHANGE` hooks `WTS_SESSION_LOCK` to purge keys from RAM when Windows is locked (`Win+L`).
 - **Screen Protection**: Optional `SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE)` prevents window capture in screenshots, OBS, and Discord screen shares.
+
+---
+
+## 3. UI/UX Design & Typography Invariants
+
+### 3.1 Extended Glyph Ranges for Game Entity Rendering
+- **Discovery**: When reading player character names encoded in CP-1252, special characters like `™` (`\x99` $\rightarrow$ `U+2122`) caused Dear ImGui's default font atlas to emit `'?'` fallbacks (`Torq?`).
+- **Decision**: Load native Windows `segoeui.ttf` with custom glyph ranges spanning:
+  - `0x0020 - 0x00FF` (Latin 1 Supplement)
+  - `0x2000 - 0x206F` (General Punctuation)
+  - `0x2100 - 0x214F` (Letterlike Symbols containing `™` `U+2122`)
+  - `0x2190 - 0x21FF` (Arrows)
+  - `0x25A0 - 0x25FF` (Geometric Shapes containing `●` bullets)
+
+### 3.2 Action Column & Layout Sizing
+- **Context**: Actions column with `Send`, `Edit`, `Delete` buttons clipped the right rounded edge of the `Delete` button when column width was `175px`.
+- **Decision**: Actions column width is established at `220px` to guarantee comfortable margins across all UI scales and padding options.
+- **Settings Layout**: Split bottom panel into a fixed 310px width for running clients and remaining width for settings, employing a 2-column table grid (`SettingsLayoutGrid`) to avoid horizontal overflow or trailing character cutoff.
+
+### 3.3 Vector UI Icons
+- **Decision**: In place of raster image assets or heavy font icon sets (e.g. FontAwesome), interactive icons (such as the Vault Lock padlock) are rendered procedurally via `ImDrawList` primitives. This ensures crisp vector scaling at any DPI, zero external file dependencies, and interactive theme/hover state color shifts.
+

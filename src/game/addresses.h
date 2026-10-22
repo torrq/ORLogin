@@ -19,7 +19,7 @@ struct ServerProfile {
 namespace Servers {
 
 inline constexpr ServerProfile HighRate{
-    "OSRO Highrate", "HR", L"OSRO.exe",
+    "Highrate", "HR", L"OSRO.exe",
     /* inGameAddress */ 0x010DCCBC, // 1 = InGame, 0 = LoggedOut / Login Screen
     /* modeAddress   */ 0x0107AA84, // 2 = InGame, 0 = LoggedOut / Login Screen
     /* name          */ 0x010DF5D8,
@@ -29,7 +29,7 @@ inline constexpr ServerProfile HighRate{
 
 // Mid Rate profile (ORTools addresses)
 inline constexpr ServerProfile MidRate{
-    "OSRO Midrate", "MR", L"OSRO Midrate.exe",
+    "Midrate", "MR", L"OSRO Midrate.exe",
     /* inGameAddress */ 0x00E884B1,
     /* modeAddress   */ 0x00E884B1,
     /* name          */ 0x00E91C00,

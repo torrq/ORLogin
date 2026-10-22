@@ -40,10 +40,22 @@ std::string ProcessReader::ReadString(uint32_t address, size_t maxLen) const {
     size_t len = strnlen(buf.data(), maxLen);
     if (len == 0) return {};
 
+    // First attempt Windows-1252 (Western European / Ragnarok Online English client encoding)
     int wlen = MultiByteToWideChar(1252, 0, buf.data(), (int)len, nullptr, 0);
+    if (wlen <= 0) {
+        // Fallback to system ANSI code page
+        wlen = MultiByteToWideChar(CP_ACP, 0, buf.data(), (int)len, nullptr, 0);
+    }
+    if (wlen <= 0) return {};
+
     std::wstring w(wlen, 0);
-    MultiByteToWideChar(1252, 0, buf.data(), (int)len, &w[0], wlen);
+    if (MultiByteToWideChar(1252, 0, buf.data(), (int)len, &w[0], wlen) <= 0) {
+        MultiByteToWideChar(CP_ACP, 0, buf.data(), (int)len, &w[0], wlen);
+    }
+
     int ulen = WideCharToMultiByte(CP_UTF8, 0, w.data(), wlen, nullptr, 0, nullptr, nullptr);
+    if (ulen <= 0) return {};
+
     std::string out(ulen, 0);
     WideCharToMultiByte(CP_UTF8, 0, w.data(), wlen, &out[0], ulen, nullptr, nullptr);
     return out;

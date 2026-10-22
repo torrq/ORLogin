@@ -9,39 +9,39 @@ static inline ImVec4 Rgb(int r, int g, int b, float a = 1.0f) {
 AppThemeColors GetThemeColors(bool dark) {
     AppThemeColors c;
     if (dark) {
-        // Dark: Emerald & Mint (OSRO Highrate identity, from rodie)
-        c.base         = Rgb(8, 15, 12);
-        c.surface      = Rgb(10, 26, 20);
-        c.panel        = Rgb(12, 31, 26);
-        c.panelHover   = Rgb(31, 63, 53);
-        c.border       = Rgb(46, 90, 74);
-        c.borderBright = Rgb(63, 122, 99);
-        c.accent       = Rgb(0, 230, 145);
-        c.primary      = Rgb(0, 150, 90);
-        c.primaryHover = Rgb(0, 185, 112);
+        // Modern Obsidian & Cyan/Azure palette
+        c.base         = Rgb(15, 17, 23);       // Deep obsidian canvas (#0F1117)
+        c.surface      = Rgb(22, 27, 34);       // Elevated card surface (#161B22)
+        c.panel        = Rgb(30, 36, 46);       // Controls, inputs & table headers (#1E242E)
+        c.panelHover   = Rgb(40, 48, 62);       // Hover highlight (#28303E)
+        c.border       = Rgb(48, 54, 61);       // Subtle crisp border (#30363D)
+        c.borderBright = Rgb(75, 85, 102);      // Active focus border (#4B5566)
+        c.accent       = Rgb(56, 189, 248);     // Electric Sky / Cyan accent (#38BDF8)
+        c.primary      = Rgb(37, 99, 235);      // Rich royal blue CTA button (#2563EB)
+        c.primaryHover = Rgb(59, 130, 246);     // Vibrant blue hover (#3B82F6)
         c.primaryText  = Rgb(255, 255, 255);
-        c.text         = Rgb(230, 240, 235);
-        c.muted        = Rgb(158, 197, 184);
-        c.green        = Rgb(34, 255, 170);
-        c.amber        = Rgb(245, 192, 74);
-        c.red          = Rgb(255, 107, 107);
+        c.text         = Rgb(240, 243, 246);     // Crisp off-white text (#F0F3F6)
+        c.muted        = Rgb(139, 148, 158);     // Cool slate secondary text (#8B949E)
+        c.green        = Rgb(52, 211, 153);      // Emerald mint (#34D399)
+        c.amber        = Rgb(251, 191, 36);      // Warm golden amber (#FBBF24)
+        c.red          = Rgb(248, 113, 113);     // Coral rose (#F87171)
     } else {
-        // Light: Paper & Emerald
-        c.base         = Rgb(242, 246, 244);
-        c.surface      = Rgb(255, 255, 255);
-        c.panel        = Rgb(234, 240, 237);
-        c.panelHover   = Rgb(218, 231, 225);
-        c.border       = Rgb(190, 208, 199);
-        c.borderBright = Rgb(140, 175, 160);
-        c.accent       = Rgb(0, 140, 88);
-        c.primary      = Rgb(0, 140, 88);
-        c.primaryHover = Rgb(0, 165, 104);
+        // Clean Studio Paper & Royal Blue palette
+        c.base         = Rgb(246, 248, 250);    // Crisp light background (#F6F8FA)
+        c.surface      = Rgb(255, 255, 255);    // Pure white cards (#FFFFFF)
+        c.panel        = Rgb(240, 243, 246);    // Soft panel (#F0F3F6)
+        c.panelHover   = Rgb(226, 232, 240);    // Light hover state (#E2E8F0)
+        c.border       = Rgb(208, 215, 222);    // Clean border line (#D0D7DE)
+        c.borderBright = Rgb(9, 105, 218);      // Focus border (#0969DA)
+        c.accent       = Rgb(9, 105, 218);      // Royal blue accent (#0969DA)
+        c.primary      = Rgb(9, 105, 218);      // Royal blue CTA (#0969DA)
+        c.primaryHover = Rgb(3, 84, 181);       // Deep blue hover (#0354B5)
         c.primaryText  = Rgb(255, 255, 255);
-        c.text         = Rgb(22, 34, 29);
-        c.muted        = Rgb(92, 112, 103);
-        c.green        = Rgb(0, 145, 85);
-        c.amber        = Rgb(180, 112, 0);
-        c.red          = Rgb(200, 45, 45);
+        c.text         = Rgb(31, 35, 40);       // Dark slate body text (#1F2328)
+        c.muted        = Rgb(101, 109, 118);    // Medium slate secondary (#656D76)
+        c.green        = Rgb(26, 127, 55);      // Forest green (#1A7F37)
+        c.amber        = Rgb(154, 103, 0);      // Warm honey amber (#9A6700)
+        c.red          = Rgb(207, 34, 46);      // Crimson red (#CF222E)
     }
     return c;
 }
@@ -51,12 +51,12 @@ void ApplyTheme(bool dark) {
     ImGuiStyle& style = ImGui::GetStyle();
 
     style.WindowRounding    = 0.0f;
-    style.ChildRounding     = 8.0f;
-    style.FrameRounding     = 6.0f;
-    style.PopupRounding     = 8.0f;
+    style.ChildRounding     = 6.0f;
+    style.FrameRounding     = 5.0f;
+    style.PopupRounding     = 6.0f;
     style.ScrollbarRounding = 4.0f;
     style.GrabRounding      = 4.0f;
-    style.TabRounding       = 6.0f;
+    style.TabRounding       = 5.0f;
 
     style.WindowBorderSize  = 0.0f;
     style.ChildBorderSize   = 1.0f;
@@ -64,12 +64,12 @@ void ApplyTheme(bool dark) {
     style.FrameBorderSize   = 1.0f;
     style.TabBorderSize     = 1.0f;
 
-    style.WindowPadding     = ImVec2(16.0f, 16.0f);
+    style.WindowPadding     = ImVec2(14.0f, 14.0f);
     style.FramePadding      = ImVec2(10.0f, 6.0f);
     style.ItemSpacing       = ImVec2(10.0f, 8.0f);
     style.ItemInnerSpacing  = ImVec2(6.0f, 6.0f);
     style.CellPadding       = ImVec2(8.0f, 6.0f);
-    style.ScrollbarSize     = 8.0f;
+    style.ScrollbarSize     = 9.0f;
 
     ImVec4* colors = style.Colors;
     colors[ImGuiCol_Text]                  = c.text;
@@ -104,15 +104,15 @@ void ApplyTheme(bool dark) {
     colors[ImGuiCol_SeparatorActive]       = c.accent;
     colors[ImGuiCol_TableHeaderBg]         = c.panel;
     colors[ImGuiCol_TableBorderStrong]     = c.border;
-    colors[ImGuiCol_TableBorderLight]      = c.border;
+    colors[ImGuiCol_TableBorderLight]      = ImVec4(c.border.x, c.border.y, c.border.z, 0.40f);
     colors[ImGuiCol_TableRowBg]            = ImVec4(0, 0, 0, 0);
-    colors[ImGuiCol_TableRowBgAlt]         = ImVec4(c.panel.x, c.panel.y, c.panel.z, 0.45f);
-    colors[ImGuiCol_TextSelectedBg]        = ImVec4(c.accent.x, c.accent.y, c.accent.z, 0.35f);
+    colors[ImGuiCol_TableRowBgAlt]         = ImVec4(c.panel.x, c.panel.y, c.panel.z, 0.35f);
+    colors[ImGuiCol_TextSelectedBg]        = ImVec4(c.accent.x, c.accent.y, c.accent.z, 0.30f);
     colors[ImGuiCol_NavHighlight]          = c.accent;
     colors[ImGuiCol_ResizeGrip]            = ImVec4(0, 0, 0, 0);
     colors[ImGuiCol_ResizeGripHovered]     = ImVec4(0, 0, 0, 0);
     colors[ImGuiCol_ResizeGripActive]      = ImVec4(0, 0, 0, 0);
-    colors[ImGuiCol_ModalWindowDimBg]      = ImVec4(c.base.x, c.base.y, c.base.z, 0.80f);
+    colors[ImGuiCol_ModalWindowDimBg]      = ImVec4(c.base.x, c.base.y, c.base.z, 0.85f);
 }
 
 } // namespace Theme

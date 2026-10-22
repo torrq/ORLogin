@@ -51,6 +51,47 @@ bool PrimaryButton(const char* label, const AppThemeColors& c, ImVec2 size = ImV
     return pressed;
 }
 
+bool RenderLockIconButton(const AppThemeColors& c) {
+    ImVec2 size(32.0f, 26.0f);
+    ImGui::PushStyleColor(ImGuiCol_Button, c.panel);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, c.panelHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, c.borderBright);
+    bool clicked = ImGui::Button("##lock_icon_btn", size);
+    ImGui::PopStyleColor(3);
+
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Lock Vault");
+    }
+
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    ImVec2 min = ImGui::GetItemRectMin();
+    ImVec2 max = ImGui::GetItemRectMax();
+    ImVec2 center((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f);
+
+    bool hovered = ImGui::IsItemHovered();
+    ImU32 iconCol = ImGui::ColorConvertFloat4ToU32(hovered ? c.accent : c.text);
+
+    // Padlock body (rounded rectangle)
+    float bodyW = 12.0f;
+    float bodyH = 9.0f;
+    ImVec2 bodyMin(center.x - bodyW * 0.5f, center.y - 0.5f);
+    ImVec2 bodyMax(center.x + bodyW * 0.5f, center.y - 0.5f + bodyH);
+    draw->AddRectFilled(bodyMin, bodyMax, iconCol, 2.0f);
+
+    // Padlock shackle (curved arch at top)
+    float shackleR = 4.2f;
+    ImVec2 shackleCenter(center.x, bodyMin.y);
+    draw->PathArcTo(shackleCenter, shackleR, 3.14159265f, 0.0f, 12);
+    draw->PathStroke(iconCol, 0, 1.8f);
+
+    // Keyhole in the lock body
+    ImU32 bgCol = ImGui::ColorConvertFloat4ToU32(hovered ? c.panelHover : c.panel);
+    draw->AddCircleFilled(ImVec2(center.x, center.y + 2.5f), 1.2f, bgCol);
+    draw->AddLine(ImVec2(center.x, center.y + 2.5f), ImVec2(center.x, center.y + 5.5f), bgCol, 1.2f);
+
+    return clicked;
+}
+
 void ApplyTitleBarDarkMode(HWND hwnd, bool dark) {
     if (!hwnd) return;
     BOOL useDark = dark ? TRUE : FALSE;
@@ -200,7 +241,7 @@ void App::OnHotkey() {
     }
 
     if (!target || !target->hwnd) {
-        FlashStatus("Focus an OSRO Highrate client at the login screen first", c.amber);
+        FlashStatus("Focus a Highrate client at the login screen first", c.amber);
         return;
     }
 
@@ -279,22 +320,22 @@ void App::RenderHeader() {
     AppThemeColors c = Theme::GetThemeColors(m_settings.darkTheme);
 
     ImGui::AlignTextToFramePadding();
-    ImGui::TextColored(c.accent, "ORLogin");
+    ImGui::TextColored(c.accent, "OSRO Login Helper");
     ImGui::SameLine();
 
     // Server badge
     ImGui::PushStyleColor(ImGuiCol_Button, c.panel);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, c.panel);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, c.panel);
-    ImGui::PushStyleColor(ImGuiCol_Text, c.muted);
+    ImGui::PushStyleColor(ImGuiCol_Text, c.accent);
     ImGui::SmallButton(m_monitor.Profile().label);
     ImGui::PopStyleColor(4);
 
-    // Right-aligned controls: [Change Master] [Lock] [Theme Toggle]
+    // Right-aligned controls: [Master Password] [Lock Icon] [Theme Toggle]
     const char* themeLabel = m_settings.darkTheme ? "Light Theme" : "Dark Theme";
     float rightWidth = ImGui::CalcTextSize(themeLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
     if (m_vault.IsUnlocked()) {
-        rightWidth += ImGui::CalcTextSize("Lock").x + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetStyle().ItemSpacing.x;
+        rightWidth += 32.0f + ImGui::GetStyle().ItemSpacing.x; // Lock icon button width
         rightWidth += ImGui::CalcTextSize("Master Password").x + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetStyle().ItemSpacing.x;
     }
 
@@ -309,7 +350,7 @@ void App::RenderHeader() {
             ImGui::OpenPopup("Change Master Password");
         }
         ImGui::SameLine();
-        if (ImGui::Button("Lock")) {
+        if (RenderLockIconButton(c)) {
             LockVault("Vault locked");
         }
         ImGui::SameLine();
@@ -461,15 +502,15 @@ void App::RenderMainScreen() {
     float footerReserve = 34.0f;
     float contentH = ImGui::GetContentRegionAvail().y - footerReserve;
 
-    float accountsH = std::max(180.0f, contentH * 0.50f);
+    float accountsH = std::max(180.0f, contentH * 0.48f);
     ImGui::BeginChild("AccountsSection", ImVec2(0, accountsH), true);
     RenderAccountsPanel();
     ImGui::EndChild();
 
-    float bottomH = std::max(150.0f, ImGui::GetContentRegionAvail().y - footerReserve);
-    float halfW   = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+    float bottomH  = std::max(160.0f, ImGui::GetContentRegionAvail().y - footerReserve);
+    float clientsW = 310.0f;
 
-    ImGui::BeginChild("ClientsSection", ImVec2(halfW, bottomH), true);
+    ImGui::BeginChild("ClientsSection", ImVec2(clientsW, bottomH), true);
     RenderClientsPanel();
     ImGui::EndChild();
 
@@ -572,7 +613,7 @@ void App::RenderAccountsPanel() {
         ImGui::TableSetupColumn("Label",    ImGuiTableColumnFlags_WidthStretch, 1.0f);
         ImGui::TableSetupColumn("Username", ImGuiTableColumnFlags_WidthStretch, 1.1f);
         ImGui::TableSetupColumn("Password", ImGuiTableColumnFlags_WidthStretch, 1.1f);
-        ImGui::TableSetupColumn("Actions",  ImGuiTableColumnFlags_WidthFixed, 175.0f);
+        ImGui::TableSetupColumn("Actions",  ImGuiTableColumnFlags_WidthFixed, 220.0f);
         ImGui::TableHeadersRow();
 
         int activeIdx = m_vault.ActiveIndex();
@@ -657,7 +698,7 @@ void App::RenderClientsPanel() {
     ImGui::Separator();
 
     if (clients.empty()) {
-        ImGui::TextColored(c.muted, "No OSRO.exe processes detected.");
+        ImGui::TextColored(c.muted, "No OSRO client processes detected.");
         return;
     }
 
@@ -676,7 +717,7 @@ void App::RenderClientsPanel() {
             }
         }
 
-        ImGui::TextColored(dotColor, "*");
+        ImGui::TextColored(dotColor, "\xE2\x97\x8F");
         ImGui::SameLine();
         ImGui::Text("PID %lu%s", (unsigned long)cl.pid, focused ? " [Focused]" : "");
         ImGui::SameLine();
@@ -690,20 +731,80 @@ void App::RenderSettingsPanel() {
     ImGui::TextColored(c.accent, "Hotkey & Login Behavior");
     ImGui::Separator();
 
-    // Hotkey capture button
-    ImGui::AlignTextToFramePadding();
-    ImGui::Text("Login Hotkey:");
-    ImGui::SameLine();
-    std::string hkLabel = m_capturingHotkey
-        ? "Press key combo... (Esc to cancel)"
-        : Hotkey::Format(m_settings.hotkeyMods, m_settings.hotkeyVk);
-    if (ImGui::Button(hkLabel.c_str())) {
-        m_capturingHotkey = true;
-        Hotkey::Unregister(m_hwnd);
-    }
-    if (!m_hotkeyRegistered && !m_capturingHotkey) {
+    if (ImGui::BeginTable("SettingsLayoutGrid", 2, ImGuiTableFlags_None)) {
+        ImGui::TableSetupColumn("LeftOptions",  ImGuiTableColumnFlags_WidthStretch, 0.52f);
+        ImGui::TableSetupColumn("RightOptions", ImGuiTableColumnFlags_WidthStretch, 0.48f);
+
+        ImGui::TableNextRow();
+
+        // ────── Left Column: Hotkey & Sequence ──────
+        ImGui::TableSetColumnIndex(0);
+
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Login Hotkey:");
         ImGui::SameLine();
-        ImGui::TextColored(c.red, "(in use by another app)");
+        std::string hkLabel = m_capturingHotkey
+            ? "Press keys... (Esc)"
+            : Hotkey::Format(m_settings.hotkeyMods, m_settings.hotkeyVk);
+        if (ImGui::Button(hkLabel.c_str())) {
+            m_capturingHotkey = true;
+            Hotkey::Unregister(m_hwnd);
+        }
+        if (!m_hotkeyRegistered && !m_capturingHotkey) {
+            ImGui::TextColored(c.red, "Hotkey conflict (in use)");
+        }
+
+        ImGui::Spacing();
+        ImGui::TextColored(c.muted, "Login Sequence:");
+        int seq = (int)m_settings.sequence;
+        if (ImGui::RadioButton("ID + Tab + Password", &seq, 0)) {
+            m_settings.sequence = LoginSequence::IdTabPassword;
+            SaveSettings();
+        }
+        if (ImGui::RadioButton("Password only (Save ID)", &seq, 1)) {
+            m_settings.sequence = LoginSequence::PasswordOnly;
+            SaveSettings();
+        }
+
+        if (m_settings.sequence == LoginSequence::IdTabPassword) {
+            if (ImGui::Checkbox("Clear ID field first", &m_settings.clearIdField)) SaveSettings();
+        }
+        if (ImGui::Checkbox("Press Enter after typing", &m_settings.pressEnter)) SaveSettings();
+
+        // ────── Right Column: Method, Safety & Timers ──────
+        ImGui::TableSetColumnIndex(1);
+
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Method:");
+        ImGui::SameLine();
+        int method = (int)m_settings.inputMethod;
+        if (ImGui::RadioButton("PostMsg", &method, 0)) {
+            m_settings.inputMethod = InputMethod::PostMessage;
+            SaveSettings();
+        }
+        ImGui::SameLine();
+        if (ImGui::RadioButton("SendInput", &method, 1)) {
+            m_settings.inputMethod = InputMethod::SendInput;
+            SaveSettings();
+        }
+
+        if (ImGui::Checkbox("Only send at Login screen", &m_settings.requireLoginScreen)) {
+            SaveSettings();
+        }
+
+        if (ImGui::Checkbox("Hide from screen capture", &m_settings.hideFromCapture)) {
+            ApplySettingsToSystem();
+            SaveSettings();
+        }
+
+        ImGui::Spacing();
+        ImGui::SetNextItemWidth(100.0f);
+        if (ImGui::SliderInt("Key delay (ms)", &m_settings.keyDelayMs, 5, 60)) SaveSettings();
+
+        ImGui::SetNextItemWidth(100.0f);
+        if (ImGui::SliderInt("Auto-lock (min)", &m_settings.autoLockMinutes, 0, 60)) SaveSettings();
+
+        ImGui::EndTable();
     }
 
     if (m_capturingHotkey) {
@@ -731,54 +832,6 @@ void App::RenderSettingsPanel() {
                 }
             }
         }
-    }
-
-    // Sequence selector
-    int seq = (int)m_settings.sequence;
-    if (ImGui::RadioButton("ID + Tab + Password", &seq, 0)) {
-        m_settings.sequence = LoginSequence::IdTabPassword;
-        SaveSettings();
-    }
-    ImGui::SameLine();
-    if (ImGui::RadioButton("Password only (Save ID)", &seq, 1)) {
-        m_settings.sequence = LoginSequence::PasswordOnly;
-        SaveSettings();
-    }
-
-    if (m_settings.sequence == LoginSequence::IdTabPassword) {
-        if (ImGui::Checkbox("Clear ID field first", &m_settings.clearIdField)) SaveSettings();
-        ImGui::SameLine();
-    }
-    if (ImGui::Checkbox("Press Enter after typing", &m_settings.pressEnter)) SaveSettings();
-
-    if (ImGui::Checkbox("Only send when client is at Login screen", &m_settings.requireLoginScreen)) {
-        SaveSettings();
-    }
-
-    // Input method & timing
-    int method = (int)m_settings.inputMethod;
-    ImGui::AlignTextToFramePadding();
-    ImGui::Text("Input:");
-    ImGui::SameLine();
-    if (ImGui::RadioButton("PostMessage", &method, 0)) {
-        m_settings.inputMethod = InputMethod::PostMessage;
-        SaveSettings();
-    }
-    ImGui::SameLine();
-    if (ImGui::RadioButton("SendInput", &method, 1)) {
-        m_settings.inputMethod = InputMethod::SendInput;
-        SaveSettings();
-    }
-
-    ImGui::SetNextItemWidth(110.0f);
-    if (ImGui::SliderInt("Key delay (ms)", &m_settings.keyDelayMs, 5, 60)) SaveSettings();
-
-    ImGui::SetNextItemWidth(110.0f);
-    if (ImGui::SliderInt("Auto-lock (min, 0=off)", &m_settings.autoLockMinutes, 0, 60)) SaveSettings();
-
-    if (ImGui::Checkbox("Hide window from screen capture", &m_settings.hideFromCapture)) {
-        ApplySettingsToSystem();
-        SaveSettings();
     }
 }
 

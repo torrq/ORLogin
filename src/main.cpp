@@ -99,8 +99,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
-        780,
-        620,
+        840,
+        640,
         nullptr,
         nullptr,
         wc.hInstance,
@@ -120,6 +120,41 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.IniFilename  = nullptr; // Do not write imgui.ini to disk
+
+    // ───────────────── TYPOGRAPHY & EXTENDED GLYPH RANGES ─────────────────
+    // Load Windows system fonts (Segoe UI / Tahoma / Arial) with glyph ranges
+    // that cover Basic Latin, Latin Supplement, General Punctuation,
+    // Letterlike Symbols (including U+2122 ™ for RO character names),
+    // Arrows, and Geometric Shapes (bullet points ●).
+    static const ImWchar glyphRanges[] = {
+        0x0020, 0x00FF, // Basic Latin + Latin Supplement
+        0x2000, 0x206F, // General Punctuation
+        0x2100, 0x214F, // Letterlike Symbols (U+2122 ™ Trademark, etc.)
+        0x2190, 0x21FF, // Arrows
+        0x25A0, 0x25FF, // Geometric Shapes (● bullets, squares, etc.)
+        0,
+    };
+
+    ImFontConfig fontCfg;
+    fontCfg.OversampleH = 2;
+    fontCfg.OversampleV = 2;
+    fontCfg.PixelSnapH  = true;
+
+    ImFont* loadedFont = nullptr;
+    const char* fontCandidates[] = {
+        "C:\\Windows\\Fonts\\segoeui.ttf",
+        "C:\\Windows\\Fonts\\tahoma.ttf",
+        "C:\\Windows\\Fonts\\arial.ttf"
+    };
+    for (const char* path : fontCandidates) {
+        if (GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) {
+            loadedFont = io.Fonts->AddFontFromFileTTF(path, 16.0f, &fontCfg, glyphRanges);
+            if (loadedFont) break;
+        }
+    }
+    if (!loadedFont) {
+        io.Fonts->AddFontDefault();
+    }
 
     // ───────────────── CASCADING RENDERER INITIALIZATION ─────────────────
     g_pRenderer = std::make_unique<DX11Renderer>(D3D_DRIVER_TYPE_HARDWARE);

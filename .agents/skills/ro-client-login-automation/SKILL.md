@@ -109,3 +109,22 @@ When typing into the RO login form:
    - Use `SecureZeroMemory` on all buffers, edit fields, and Dear ImGui internal text edit states (`ImGuiInputTextState`) immediately upon submission or form closure.
 5. **Session Lock Purging**:
    - Hook `WM_WTSSESSION_CHANGE` (`WTS_SESSION_LOCK`). Instantly wipe keys and lock vaults when the user locks Windows (`Win + L`).
+
+---
+
+## 5. Character Set & Font Atlas Ranges
+
+### 5.1 RO Client Character Encodings
+- Ragnarok Online clients store character and map strings in Windows-1252 (CP-1252) for Western/English servers or EUC-KR / CP-949 for Korean clients.
+- Player character names frequently contain extended symbols such as the Trademark sign (`™`, byte `0x99` in CP-1252 $\rightarrow$ Unicode `U+2122`).
+- Convert memory strings using `MultiByteToWideChar(1252, ...)` (falling back to `CP_ACP`) to `std::wstring`, then `WideCharToMultiByte(CP_UTF8, ...)` for UTF-8.
+
+### 5.2 Dear ImGui Font Atlas Requirements
+- Dear ImGui's default font (ProggyClean) and standard Latin range (`0x0020 - 0x00FF`) do **not** include Letterlike Symbols (`0x2100 - 0x214F`). Missing glyphs fall back to `'?'` (e.g. rendering `Torq™` as `Torq?`).
+- Always load a modern system font (e.g. `C:\Windows\Fonts\segoeui.ttf`) with explicit glyph ranges:
+  - `0x0020 - 0x00FF` (Basic Latin + Latin Supplement)
+  - `0x2000 - 0x206F` (General Punctuation)
+  - `0x2100 - 0x214F` (Letterlike Symbols — contains `U+2122` `™`)
+  - `0x2190 - 0x21FF` (Arrows)
+  - `0x25A0 - 0x25FF` (Geometric Shapes — contains `●` bullets)
+
