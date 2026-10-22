@@ -30,6 +30,7 @@ public:
 
     const char* GetWindowTitle() const { return "OSRO Login Helper"; }
     bool IsDarkTheme() const { return m_settings.darkTheme; }
+    void SetSmallFont(ImFont* f) { m_smallFont = f; }
 
     void FlashStatus(const std::string& msg, ImVec4 color);
 
@@ -41,9 +42,11 @@ private:
     void RenderAccountsPanel();
     void RenderClientsPanel();
     void RenderSettingsPanel();
+    void RenderAccountModal();
     void RenderChangeMasterModal();
     void RenderAdvancedSettingsModal();
     void RenderStatusBar();
+    bool CheckModalDismiss(bool& isOpen, bool wipeBuffers = false);
 
     void ApplySettingsToSystem();
     void SaveSettings();
@@ -72,13 +75,14 @@ private:
     int         m_failedUnlocks    = 0;
     ULONGLONG   m_cooldownUntilTick = 0;
 
-    // Add / edit account inline form
-    bool        m_accountFormOpen = false;
-    int         m_editingIndex    = -1; // -1 = adding new
-    char        m_labelBuf[64]    = {};
-    char        m_userBuf[64]     = {};
+    // Add / edit account modal form
+    bool        m_accountFormOpen   = false;
+    bool        m_focusAccountField = false;
+    int         m_editingIndex      = -1; // -1 = adding new
+    char        m_labelBuf[64]      = {};
+    char        m_userBuf[64]       = {};
     SecureBytes m_accPwBuf;
-    bool        m_showAccPw       = false;
+    bool        m_showAccPw         = false;
 
     // Inline delete confirmation
     int m_confirmDeleteIndex = -1;
@@ -88,6 +92,9 @@ private:
 
     // Advanced timing settings modal
     bool m_advancedSettingsOpen = false;
+
+    // Fonts
+    ImFont* m_smallFont = nullptr;
 
     // Hotkey capture state
     bool m_capturingHotkey = false;

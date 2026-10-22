@@ -70,24 +70,106 @@ bool RenderLockIconButton(const AppThemeColors& c) {
 
     bool hovered = ImGui::IsItemHovered();
     ImU32 iconCol = ImGui::ColorConvertFloat4ToU32(hovered ? c.accent : c.text);
+    ImU32 bgCol   = ImGui::ColorConvertFloat4ToU32(hovered ? c.panelHover : c.panel);
 
-    // Padlock body (rounded rectangle)
-    float bodyW = 12.0f;
-    float bodyH = 9.0f;
-    ImVec2 bodyMin(center.x - bodyW * 0.5f, center.y - 0.5f);
-    ImVec2 bodyMax(center.x + bodyW * 0.5f, center.y - 0.5f + bodyH);
+    // Padlock dimensions
+    float bodyW = 14.0f;
+    float bodyH = 10.0f;
+    float bodyMinY = center.y - 1.0f;
+    float bodyMaxY = bodyMinY + bodyH;
+
+    // 1. Shackle (inverted U-arch with vertical legs extending into the body)
+    float shackleR = 4.2f;
+    float shackleArchCenterY = bodyMinY - 2.5f;
+    draw->PathLineTo(ImVec2(center.x - shackleR, bodyMinY + 2.0f));
+    draw->PathLineTo(ImVec2(center.x - shackleR, shackleArchCenterY));
+    draw->PathArcTo(ImVec2(center.x, shackleArchCenterY), shackleR, 3.14159265f, 0.0f, 16);
+    draw->PathLineTo(ImVec2(center.x + shackleR, shackleArchCenterY));
+    draw->PathLineTo(ImVec2(center.x + shackleR, bodyMinY + 2.0f));
+    draw->PathStroke(iconCol, 0, 2.0f);
+
+    // 2. Padlock body (rounded solid rectangle overlapping the shackle leg bases)
+    ImVec2 bodyMin(center.x - bodyW * 0.5f, bodyMinY);
+    ImVec2 bodyMax(center.x + bodyW * 0.5f, bodyMaxY);
     draw->AddRectFilled(bodyMin, bodyMax, iconCol, 2.0f);
 
-    // Padlock shackle (curved arch at top)
-    float shackleR = 4.2f;
-    ImVec2 shackleCenter(center.x, bodyMin.y);
-    draw->PathArcTo(shackleCenter, shackleR, 3.14159265f, 0.0f, 12);
-    draw->PathStroke(iconCol, 0, 1.8f);
+    // 3. Keyhole cutout (circle + trapezoid slit in background color)
+    float keyholeY = bodyMinY + 3.8f;
+    draw->AddCircleFilled(ImVec2(center.x, keyholeY), 1.5f, bgCol);
+    ImVec2 p1(center.x - 1.1f, keyholeY);
+    ImVec2 p2(center.x + 1.1f, keyholeY);
+    ImVec2 p3(center.x + 0.6f, bodyMinY + 7.5f);
+    ImVec2 p4(center.x - 0.6f, bodyMinY + 7.5f);
+    draw->AddQuadFilled(p1, p2, p3, p4, bgCol);
 
-    // Keyhole in the lock body
-    ImU32 bgCol = ImGui::ColorConvertFloat4ToU32(hovered ? c.panelHover : c.panel);
-    draw->AddCircleFilled(ImVec2(center.x, center.y + 2.5f), 1.2f, bgCol);
-    draw->AddLine(ImVec2(center.x, center.y + 2.5f), ImVec2(center.x, center.y + 5.5f), bgCol, 1.2f);
+    return clicked;
+}
+
+bool RenderThemeIconButton(bool darkTheme, const AppThemeColors& c) {
+    ImVec2 size(34.0f, 28.0f);
+    ImGui::PushStyleColor(ImGuiCol_Button, c.panel);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, c.panelHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, c.borderBright);
+    bool clicked = ImGui::Button("##theme_toggle_btn", size);
+    ImGui::PopStyleColor(3);
+
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(darkTheme ? "Switch to Light Theme" : "Switch to Dark Theme");
+    }
+
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    ImVec2 min = ImGui::GetItemRectMin();
+    ImVec2 max = ImGui::GetItemRectMax();
+    ImVec2 center((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f);
+
+    bool hovered = ImGui::IsItemHovered();
+    ImU32 iconCol = ImGui::ColorConvertFloat4ToU32(hovered ? c.accent : c.text);
+
+    // Lightbulb dome
+    ImVec2 domeC(center.x, center.y - 2.5f);
+    float domeR = 4.4f;
+
+    if (!darkTheme) {
+        // Light mode (illuminated bulb with warm glow and radiant rays)
+        ImU32 glowCol = ImColor(255, 200, 40, 255);
+        ImU32 fillCol = ImColor(255, 220, 80, hovered ? 245 : 200);
+
+        // Glass bulb (circle + neck) filled
+        draw->AddCircleFilled(domeC, domeR, fillCol);
+        ImVec2 neckP1(center.x - 3.2f, center.y + 0.5f);
+        ImVec2 neckP2(center.x + 3.2f, center.y + 0.5f);
+        ImVec2 neckP3(center.x + 2.0f, center.y + 3.6f);
+        ImVec2 neckP4(center.x - 2.0f, center.y + 3.6f);
+        draw->AddQuadFilled(neckP1, neckP2, neckP3, neckP4, fillCol);
+
+        // Radiant rays
+        draw->AddLine(ImVec2(center.x, center.y - 8.5f), ImVec2(center.x, center.y - 11.0f), glowCol, 1.6f);
+        draw->AddLine(ImVec2(center.x - 5.5f, center.y - 6.5f), ImVec2(center.x - 7.5f, center.y - 8.5f), glowCol, 1.6f);
+        draw->AddLine(ImVec2(center.x + 5.5f, center.y - 6.5f), ImVec2(center.x + 7.5f, center.y - 8.5f), glowCol, 1.6f);
+        draw->AddLine(ImVec2(center.x - 6.5f, center.y - 2.5f), ImVec2(center.x - 9.0f, center.y - 2.5f), glowCol, 1.6f);
+        draw->AddLine(ImVec2(center.x + 6.5f, center.y - 2.5f), ImVec2(center.x + 9.0f, center.y - 2.5f), glowCol, 1.6f);
+
+        // Screw base
+        draw->AddLine(ImVec2(center.x - 2.0f, center.y + 4.8f), ImVec2(center.x + 2.0f, center.y + 4.8f), iconCol, 1.5f);
+        draw->AddLine(ImVec2(center.x - 1.4f, center.y + 6.2f), ImVec2(center.x + 1.4f, center.y + 6.2f), iconCol, 1.5f);
+    } else {
+        // Dark mode (clean vector bulb outline with filament)
+        draw->PathArcTo(domeC, domeR, 2.55f, 0.59f, 16);
+        draw->PathLineTo(ImVec2(center.x + 2.0f, center.y + 3.6f));
+        draw->PathLineTo(ImVec2(center.x - 2.0f, center.y + 3.6f));
+        draw->PathStroke(iconCol, ImDrawFlags_Closed, 1.6f);
+
+        // Filament inside
+        ImU32 filCol = ImGui::ColorConvertFloat4ToU32(hovered ? c.accent : c.amber);
+        draw->AddLine(ImVec2(center.x - 1.5f, center.y + 2.0f), ImVec2(center.x - 0.9f, center.y - 1.5f), filCol, 1.2f);
+        draw->AddLine(ImVec2(center.x - 0.9f, center.y - 1.5f), ImVec2(center.x, center.y - 0.5f), filCol, 1.2f);
+        draw->AddLine(ImVec2(center.x, center.y - 0.5f), ImVec2(center.x + 0.9f, center.y - 1.5f), filCol, 1.2f);
+        draw->AddLine(ImVec2(center.x + 0.9f, center.y - 1.5f), ImVec2(center.x + 1.5f, center.y + 2.0f), filCol, 1.2f);
+
+        // Screw base
+        draw->AddLine(ImVec2(center.x - 2.0f, center.y + 4.8f), ImVec2(center.x + 2.0f, center.y + 4.8f), iconCol, 1.5f);
+        draw->AddLine(ImVec2(center.x - 1.4f, center.y + 6.2f), ImVec2(center.x + 1.4f, center.y + 6.2f), iconCol, 1.5f);
+    }
 
     return clicked;
 }
@@ -173,6 +255,7 @@ void App::LockVault(const char* reason) {
     m_editingIndex        = -1;
     m_confirmDeleteIndex  = -1;
     m_changeMasterOpen    = false;
+    m_advancedSettingsOpen = false;
     m_capturingHotkey     = false;
     m_focusMasterInput    = true;
     WipeFormBuffers();
@@ -181,6 +264,27 @@ void App::LockVault(const char* reason) {
         AppThemeColors c = Theme::GetThemeColors(m_settings.darkTheme);
         FlashStatus(reason, c.amber);
     }
+}
+
+bool App::CheckModalDismiss(bool& isOpen, bool wipeBuffers) {
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        if (wipeBuffers) WipeFormBuffers();
+        isOpen = false;
+        ImGui::CloseCurrentPopup();
+        return true;
+    }
+    if (!ImGui::IsWindowAppearing() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        ImVec2 m = ImGui::GetMousePos();
+        ImVec2 p = ImGui::GetWindowPos();
+        ImVec2 s = ImGui::GetWindowSize();
+        if (m.x < p.x || m.x > p.x + s.x || m.y < p.y || m.y > p.y + s.y) {
+            if (wipeBuffers) WipeFormBuffers();
+            isOpen = false;
+            ImGui::CloseCurrentPopup();
+            return true;
+        }
+    }
+    return false;
 }
 
 void App::TouchActivity() {
@@ -337,9 +441,8 @@ void App::RenderHeader() {
     ImGui::SmallButton(m_monitor.Profile().label);
     ImGui::PopStyleColor(4);
 
-    // Right-aligned controls: [Master Password] [Lock Icon] [Theme Toggle]
-    const char* themeLabel = m_settings.darkTheme ? "Light Theme" : "Dark Theme";
-    float rightWidth = ImGui::CalcTextSize(themeLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    // Right-aligned controls: [Master Password] [Lock Icon] [Theme Icon]
+    float rightWidth = 34.0f; // Theme icon button width
     if (m_vault.IsUnlocked()) {
         rightWidth += 34.0f + ImGui::GetStyle().ItemSpacing.x; // Lock icon button width
         rightWidth += ImGui::CalcTextSize("Master Password").x + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetStyle().ItemSpacing.x;
@@ -362,7 +465,7 @@ void App::RenderHeader() {
         ImGui::SameLine();
     }
 
-    if (ImGui::Button(themeLabel)) {
+    if (RenderThemeIconButton(m_settings.darkTheme, c)) {
         m_settings.darkTheme = !m_settings.darkTheme;
         ApplySettingsToSystem();
         SaveSettings();
@@ -486,6 +589,8 @@ void App::OpenAddAccountForm() {
     m_accountFormOpen    = true;
     m_editingIndex       = -1;
     m_confirmDeleteIndex = -1;
+    m_focusAccountField  = true;
+    ImGui::OpenPopup("Account Details");
 }
 
 void App::OpenEditAccountForm(int index) {
@@ -495,6 +600,7 @@ void App::OpenEditAccountForm(int index) {
     m_accountFormOpen    = true;
     m_editingIndex       = index;
     m_confirmDeleteIndex = -1;
+    m_focusAccountField  = true;
 
     snprintf(m_labelBuf, sizeof(m_labelBuf), "%s", accounts[index].label.c_str());
     snprintf(m_userBuf, sizeof(m_userBuf), "%s", accounts[index].username.c_str());
@@ -502,19 +608,21 @@ void App::OpenEditAccountForm(int index) {
     size_t copyLen = std::min(pw.size(), m_accPwBuf.size() - 1);
     if (copyLen > 0) std::memcpy(m_accPwBuf.data(), pw.data(), copyLen);
     m_accPwBuf[copyLen] = 0;
+    ImGui::OpenPopup("Account Details");
 }
 
 void App::RenderMainScreen() {
     float footerReserve = 34.0f;
     float contentH = ImGui::GetContentRegionAvail().y - footerReserve;
 
-    float accountsH = std::clamp(contentH * 0.40f, 150.0f, 210.0f);
+    float bottomH  = 135.0f;
+    float accountsH = std::max(180.0f, contentH - bottomH - ImGui::GetStyle().ItemSpacing.y);
+
     ImGui::BeginChild("AccountsSection", ImVec2(0, accountsH), true);
     RenderAccountsPanel();
     ImGui::EndChild();
 
-    float bottomH  = std::max(180.0f, ImGui::GetContentRegionAvail().y - footerReserve);
-    float clientsW = 320.0f;
+    float clientsW = 340.0f;
 
     ImGui::BeginChild("ClientsSection", ImVec2(clientsW, bottomH), true);
     RenderClientsPanel();
@@ -526,6 +634,7 @@ void App::RenderMainScreen() {
     RenderSettingsPanel();
     ImGui::EndChild();
 
+    RenderAccountModal();
     RenderChangeMasterModal();
     RenderAdvancedSettingsModal();
 }
@@ -546,67 +655,11 @@ void App::RenderAccountsPanel() {
     if (avail > btnW) ImGui::SameLine(ImGui::GetCursorPosX() + avail - btnW);
     else              ImGui::SameLine();
 
-    if (!m_accountFormOpen && PrimaryButton("+ Add Account", c)) {
+    if (PrimaryButton("+ Add Account", c)) {
         OpenAddAccountForm();
     }
 
     ImGui::Separator();
-
-    // Inline Add / Edit form
-    if (m_accountFormOpen) {
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, c.panel);
-        ImGui::BeginChild("AccountForm", ImVec2(0, 108.0f), true);
-        ImGui::TextColored(c.accent, m_editingIndex < 0 ? "Add Account" : "Edit Account");
-
-        float fieldW = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x * 2.0f) / 3.0f;
-        ImGui::SetNextItemWidth(fieldW);
-        ImGui::InputTextWithHint("##acc_label", "Label (optional)", m_labelBuf, sizeof(m_labelBuf));
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(fieldW);
-        bool userSubmit = ImGui::InputTextWithHint("##acc_user", "Username / ID", m_userBuf, sizeof(m_userBuf),
-                                                   ImGuiInputTextFlags_EnterReturnsTrue);
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(fieldW);
-        ImGuiInputTextFlags pf = ImGuiInputTextFlags_NoUndoRedo | ImGuiInputTextFlags_EnterReturnsTrue |
-                                 (m_showAccPw ? ImGuiInputTextFlags_None : ImGuiInputTextFlags_Password);
-        bool pwSubmit = ImGui::InputTextWithHint("##acc_pw", "Password", reinterpret_cast<char*>(m_accPwBuf.data()), m_accPwBuf.size(), pf);
-
-        ImGui::Checkbox("Show password", &m_showAccPw);
-        ImGui::SameLine();
-        if (PrimaryButton("Save Account", c) || userSubmit || pwSubmit) {
-            SecureBytes pw = SecureFromEditBuffer(m_accPwBuf);
-            if (std::strlen(m_userBuf) == 0) {
-                FlashStatus("Username cannot be empty", c.red);
-            } else if (pw.empty()) {
-                FlashStatus("Password cannot be empty", c.red);
-            } else {
-                Account a;
-                a.label    = m_labelBuf;
-                a.username = m_userBuf;
-                a.password.Set(pw);
-                if (m_editingIndex < 0) {
-                    accounts.push_back(std::move(a));
-                    if (m_vault.ActiveIndex() < 0) m_vault.SetActiveIndex((int)accounts.size() - 1);
-                } else if (m_editingIndex < (int)accounts.size()) {
-                    accounts[m_editingIndex] = std::move(a);
-                }
-                m_vault.NormalizeActive();
-                m_accountFormOpen = false;
-                WipeFormBuffers();
-
-                Vault::Status st = m_vault.Save();
-                FlashStatus(st == Vault::Status::Ok ? "Account saved & encrypted" : Vault::StatusText(st),
-                            st == Vault::Status::Ok ? c.green : c.red);
-            }
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel")) {
-            m_accountFormOpen = false;
-            WipeFormBuffers();
-        }
-        ImGui::EndChild();
-        ImGui::PopStyleColor();
-    }
 
     if (accounts.empty()) {
         ImGui::Spacing();
@@ -696,6 +749,8 @@ void App::RenderClientsPanel() {
     AppThemeColors c = Theme::GetThemeColors(m_settings.darkTheme);
     const auto& clients = m_monitor.Clients();
 
+    if (m_smallFont) ImGui::PushFont(m_smallFont);
+
     ImGui::AlignTextToFramePadding();
     ImGui::TextColored(c.accent, "Running Clients (%zu)", clients.size());
     ImGui::SameLine();
@@ -707,6 +762,7 @@ void App::RenderClientsPanel() {
 
     if (clients.empty()) {
         ImGui::TextColored(c.muted, "No OSRO client processes detected.");
+        if (m_smallFont) ImGui::PopFont();
         return;
     }
 
@@ -738,13 +794,15 @@ void App::RenderClientsPanel() {
         ImGui::SameLine();
         ImGui::TextColored(dotColor, "%s", status.c_str());
     }
+
+    if (m_smallFont) ImGui::PopFont();
 }
 
 void App::RenderSettingsPanel() {
     AppThemeColors c = Theme::GetThemeColors(m_settings.darkTheme);
 
     ImGui::AlignTextToFramePadding();
-    ImGui::TextColored(c.accent, "Hotkey & Login Behavior");
+    ImGui::TextColored(c.accent, "Settings");
     ImGui::SameLine();
 
     float advW = ImGui::CalcTextSize("Advanced...").x + ImGui::GetStyle().FramePadding.x * 2.0f;
@@ -755,82 +813,47 @@ void App::RenderSettingsPanel() {
     if (ImGui::Button("Advanced...")) {
         m_advancedSettingsOpen = true;
     }
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Redefine specific keystroke & transition delays");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Configure keystroke injection method, sequence, safety checks & delays");
     ImGui::Separator();
 
-    if (ImGui::BeginTable("SettingsLayoutGrid", 2, ImGuiTableFlags_None)) {
-        ImGui::TableSetupColumn("LeftOptions",  ImGuiTableColumnFlags_WidthStretch, 0.52f);
-        ImGui::TableSetupColumn("RightOptions", ImGuiTableColumnFlags_WidthStretch, 0.48f);
-
-        ImGui::TableNextRow();
-
-        // ────── Left Column: Hotkey & Sequence ──────
-        ImGui::TableSetColumnIndex(0);
-
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text("Login Hotkey:");
+    // 1. Hotkey
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("Login Hotkey:");
+    ImGui::SameLine();
+    std::string hkLabel = m_capturingHotkey
+        ? "Press keys... (Esc)"
+        : Hotkey::Format(m_settings.hotkeyMods, m_settings.hotkeyVk);
+    if (ImGui::Button(hkLabel.c_str())) {
+        m_capturingHotkey = true;
+        Hotkey::Unregister(m_hwnd);
+    }
+    if (!m_hotkeyRegistered && !m_capturingHotkey) {
         ImGui::SameLine();
-        std::string hkLabel = m_capturingHotkey
-            ? "Press keys... (Esc)"
-            : Hotkey::Format(m_settings.hotkeyMods, m_settings.hotkeyVk);
-        if (ImGui::Button(hkLabel.c_str())) {
-            m_capturingHotkey = true;
-            Hotkey::Unregister(m_hwnd);
-        }
-        if (!m_hotkeyRegistered && !m_capturingHotkey) {
-            ImGui::SameLine();
-            ImGui::TextColored(c.red, "(conflict)");
-        }
+        ImGui::TextColored(c.red, "(conflict)");
+    }
 
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextColored(c.muted, "Sequence:");
+    // 2. Hide from screen capture
+    if (ImGui::Checkbox("Hide from screen capture", &m_settings.hideFromCapture)) {
+        ApplySettingsToSystem();
+        SaveSettings();
+    }
+
+    // 3. Auto-lock vault
+    bool autoLockEnabled = (m_settings.autoLockMinutes > 0);
+    if (ImGui::Checkbox("Auto-lock vault", &autoLockEnabled)) {
+        if (autoLockEnabled) {
+            m_settings.autoLockMinutes = 15;
+        } else {
+            m_settings.autoLockMinutes = 0;
+        }
+        SaveSettings();
+    }
+    if (autoLockEnabled) {
         ImGui::SameLine();
-        int seq = (int)m_settings.sequence;
-        if (ImGui::RadioButton("ID + Pass", &seq, 0)) {
-            m_settings.sequence = LoginSequence::IdTabPassword;
+        ImGui::SetNextItemWidth(100.0f);
+        if (ImGui::SliderInt("##auto_lock_val", &m_settings.autoLockMinutes, 1, 60, "%d min")) {
             SaveSettings();
         }
-        ImGui::SameLine();
-        if (ImGui::RadioButton("Pass only", &seq, 1)) {
-            m_settings.sequence = LoginSequence::PasswordOnly;
-            SaveSettings();
-        }
-
-        if (m_settings.sequence == LoginSequence::IdTabPassword) {
-            if (ImGui::Checkbox("Clear ID field first", &m_settings.clearIdField)) SaveSettings();
-        }
-        if (ImGui::Checkbox("Press Enter twice after typing", &m_settings.pressEnter)) SaveSettings();
-
-        // ────── Right Column: Method, Safety & Timers ──────
-        ImGui::TableSetColumnIndex(1);
-
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text("Method:");
-        ImGui::SameLine();
-        int method = (int)m_settings.inputMethod;
-        if (ImGui::RadioButton("PostMsg", &method, 0)) {
-            m_settings.inputMethod = InputMethod::PostMessage;
-            SaveSettings();
-        }
-        ImGui::SameLine();
-        if (ImGui::RadioButton("SendInput", &method, 1)) {
-            m_settings.inputMethod = InputMethod::SendInput;
-            SaveSettings();
-        }
-
-        if (ImGui::Checkbox("Only send at Login screen", &m_settings.requireLoginScreen)) {
-            SaveSettings();
-        }
-
-        if (ImGui::Checkbox("Hide from screen capture", &m_settings.hideFromCapture)) {
-            ApplySettingsToSystem();
-            SaveSettings();
-        }
-
-        ImGui::SetNextItemWidth(90.0f);
-        if (ImGui::SliderInt("Auto-lock (min)", &m_settings.autoLockMinutes, 0, 60)) SaveSettings();
-
-        ImGui::EndTable();
     }
 
     if (m_capturingHotkey) {
@@ -861,28 +884,131 @@ void App::RenderSettingsPanel() {
     }
 }
 
-void App::RenderChangeMasterModal() {
-    if (!m_changeMasterOpen) return;
+void App::RenderAccountModal() {
+    if (m_accountFormOpen) {
+        ImGui::OpenPopup("Account Details");
+    }
     AppThemeColors c = Theme::GetThemeColors(m_settings.darkTheme);
 
-    ImGui::SetNextWindowSize(ImVec2(400, 260), ImGuiCond_Always);
-    if (ImGui::BeginPopupModal("Change Master Password", &m_changeMasterOpen, ImGuiWindowFlags_NoResize)) {
+    ImGui::SetNextWindowSize(ImVec2(440.0f, 0.0f), ImGuiCond_Always);
+    if (ImGui::BeginPopupModal("Account Details", &m_accountFormOpen, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
+        if (CheckModalDismiss(m_accountFormOpen, true)) {
+            ImGui::EndPopup();
+            return;
+        }
+
+        auto& accounts = m_vault.Accounts();
+        bool isNew = (m_editingIndex < 0);
+
+        ImGui::TextColored(c.accent, isNew ? "Add New Account" : "Edit Account");
+        ImGui::TextColored(c.muted, isNew ? "Credentials are AES-256-GCM encrypted in your vault." : "Update your stored credentials.");
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::Text("Label (optional)");
+        ImGui::SetNextItemWidth(-1);
+        if (m_focusAccountField) {
+            ImGui::SetKeyboardFocusHere();
+            m_focusAccountField = false;
+        }
+        bool labelSubmit = ImGui::InputTextWithHint("##modal_acc_label", "e.g. Main / Priest / Vendor",
+                                                    m_labelBuf, sizeof(m_labelBuf), ImGuiInputTextFlags_EnterReturnsTrue);
+
+        ImGui::Spacing();
+        ImGui::Text("Username / ID");
+        ImGui::SetNextItemWidth(-1);
+        bool userSubmit = ImGui::InputTextWithHint("##modal_acc_user", "Game account username",
+                                                   m_userBuf, sizeof(m_userBuf), ImGuiInputTextFlags_EnterReturnsTrue);
+
+        ImGui::Spacing();
+        ImGui::Text("Password");
+        ImGui::SetNextItemWidth(-1);
+        ImGuiInputTextFlags pf = ImGuiInputTextFlags_NoUndoRedo | ImGuiInputTextFlags_EnterReturnsTrue |
+                                 (m_showAccPw ? ImGuiInputTextFlags_None : ImGuiInputTextFlags_Password);
+        bool pwSubmit = ImGui::InputTextWithHint("##modal_acc_pw", "Game account password",
+                                                 reinterpret_cast<char*>(m_accPwBuf.data()), m_accPwBuf.size(), pf);
+
+        ImGui::Spacing();
+        ImGui::Checkbox("Show password", &m_showAccPw);
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        if (PrimaryButton(isNew ? "Add Account" : "Save Changes", c) || labelSubmit || userSubmit || pwSubmit) {
+            SecureBytes pw = SecureFromEditBuffer(m_accPwBuf);
+            if (std::strlen(m_userBuf) == 0) {
+                FlashStatus("Username cannot be empty", c.red);
+            } else if (pw.empty()) {
+                FlashStatus("Password cannot be empty", c.red);
+            } else {
+                Account a;
+                a.label    = m_labelBuf;
+                a.username = m_userBuf;
+                a.password.Set(pw);
+                if (m_editingIndex < 0) {
+                    accounts.push_back(std::move(a));
+                    if (m_vault.ActiveIndex() < 0) m_vault.SetActiveIndex((int)accounts.size() - 1);
+                } else if (m_editingIndex < (int)accounts.size()) {
+                    accounts[m_editingIndex] = std::move(a);
+                }
+                m_vault.NormalizeActive();
+                m_accountFormOpen = false;
+                WipeFormBuffers();
+                ImGui::CloseCurrentPopup();
+
+                Vault::Status st = m_vault.Save();
+                FlashStatus(st == Vault::Status::Ok ? "Account saved & encrypted" : Vault::StatusText(st),
+                            st == Vault::Status::Ok ? c.green : c.red);
+            }
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            m_accountFormOpen = false;
+            WipeFormBuffers();
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+}
+
+void App::RenderChangeMasterModal() {
+    if (m_changeMasterOpen) {
+        ImGui::OpenPopup("Change Master Password");
+    }
+    AppThemeColors c = Theme::GetThemeColors(m_settings.darkTheme);
+
+    ImGui::SetNextWindowSize(ImVec2(440.0f, 0.0f), ImGuiCond_Always);
+    if (ImGui::BeginPopupModal("Change Master Password", &m_changeMasterOpen, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
+        if (CheckModalDismiss(m_changeMasterOpen, true)) {
+            ImGui::EndPopup();
+            return;
+        }
+
         ImGuiInputTextFlags pf = ImGuiInputTextFlags_Password | ImGuiInputTextFlags_NoUndoRedo;
 
         ImGui::Text("Current Master Password");
         ImGui::SetNextItemWidth(-1);
         ImGui::InputText("##cur_mp", reinterpret_cast<char*>(m_pwBuf1.data()), m_pwBuf1.size(), pf);
 
+        ImGui::Spacing();
         ImGui::Text("New Master Password");
         ImGui::SetNextItemWidth(-1);
         ImGui::InputText("##new_mp1", reinterpret_cast<char*>(m_pwBuf2.data()), m_pwBuf2.size(), pf);
 
+        ImGui::Spacing();
         ImGui::Text("Confirm New Master Password");
         ImGui::SetNextItemWidth(-1);
         bool mpSubmit = ImGui::InputText("##new_mp2", reinterpret_cast<char*>(m_pwBuf3.data()), m_pwBuf3.size(),
                                          pf | ImGuiInputTextFlags_EnterReturnsTrue);
 
         ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
         if (PrimaryButton("Update Master Password", c) || mpSubmit) {
             SecureBytes cur = SecureFromEditBuffer(m_pwBuf1);
             SecureBytes n1  = SecureFromEditBuffer(m_pwBuf2);
@@ -919,12 +1045,68 @@ void App::RenderAdvancedSettingsModal() {
     }
     AppThemeColors c = Theme::GetThemeColors(m_settings.darkTheme);
 
-    ImGui::SetNextWindowSize(ImVec2(520, 500), ImGuiCond_Always);
-    if (ImGui::BeginPopupModal("Advanced Settings", &m_advancedSettingsOpen, ImGuiWindowFlags_NoResize)) {
-        ImGui::TextColored(c.accent, "Timing & Delay Configuration");
-        ImGui::TextWrapped("Redefine specific millisecond delays for keystroke injection, field navigation, and server prompts.");
+    ImGui::SetNextWindowSize(ImVec2(540.0f, 0.0f), ImGuiCond_Always);
+    if (ImGui::BeginPopupModal("Advanced Settings", &m_advancedSettingsOpen, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
+        if (CheckModalDismiss(m_advancedSettingsOpen, false)) {
+            ImGui::EndPopup();
+            return;
+        }
+
+        ImGui::TextColored(c.accent, "Keystroke & Input Mechanics");
+        ImGui::TextColored(c.muted, "Configure input injection method, credential sequence, and safety checks.");
         ImGui::Spacing();
         ImGui::Separator();
+        ImGui::Spacing();
+
+        // ────── Input Method ──────
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Input Method:");
+        ImGui::SameLine();
+        int method = (int)m_settings.inputMethod;
+        if (ImGui::RadioButton("PostMessage", &method, 0)) {
+            m_settings.inputMethod = InputMethod::PostMessage;
+            SaveSettings();
+        }
+        ImGui::SameLine();
+        if (ImGui::RadioButton("SendInput", &method, 1)) {
+            m_settings.inputMethod = InputMethod::SendInput;
+            SaveSettings();
+        }
+        ImGui::TextColored(c.muted, "PostMessage delivers keystrokes directly to the client even when unfocused.");
+
+        ImGui::Spacing();
+
+        // ────── Credential Sequence ──────
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Credential Sequence:");
+        ImGui::SameLine();
+        int seq = (int)m_settings.sequence;
+        if (ImGui::RadioButton("ID + Password", &seq, 0)) {
+            m_settings.sequence = LoginSequence::IdTabPassword;
+            SaveSettings();
+        }
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Password only", &seq, 1)) {
+            m_settings.sequence = LoginSequence::PasswordOnly;
+            SaveSettings();
+        }
+
+        if (m_settings.sequence == LoginSequence::IdTabPassword) {
+            if (ImGui::Checkbox("Clear ID field first", &m_settings.clearIdField)) SaveSettings();
+        }
+        if (ImGui::Checkbox("Press Enter twice after typing (confirm Service Select)", &m_settings.pressEnter)) SaveSettings();
+
+        if (ImGui::Checkbox("Only send at Login screen", &m_settings.requireLoginScreen)) {
+            SaveSettings();
+        }
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // ────── Timing & Delays ──────
+        ImGui::TextColored(c.accent, "Timing & Delay Configuration");
+        ImGui::TextColored(c.muted, "Redefine millisecond delays for keystroke injection and server prompts.");
         ImGui::Spacing();
 
         ImGui::Text("Character Typing Delay");
@@ -936,7 +1118,7 @@ void App::RenderAdvancedSettingsModal() {
         ImGui::Text("Double-Enter Pause");
         ImGui::SetNextItemWidth(-1);
         if (ImGui::SliderInt("##adv_enter_delay", &m_settings.enterDelayMs, 50, 1000, "%d ms")) SaveSettings();
-        ImGui::TextColored(c.muted, "Pause between 1st Return (submit credentials) and 2nd Return (select service). Default: 300 ms.");
+        ImGui::TextColored(c.muted, "Pause between 1st Return (credentials) and 2nd Return (service select). Default: 300 ms.");
         ImGui::Spacing();
 
         ImGui::Text("Tab Switch Delay");
@@ -955,19 +1137,24 @@ void App::RenderAdvancedSettingsModal() {
         ImGui::SetNextItemWidth(-1);
         if (ImGui::SliderInt("##adv_hold_delay", &m_settings.keyHoldMs, 2, 50, "%d ms")) SaveSettings();
         ImGui::TextColored(c.muted, "Key-down hold duration before key-up release (default: 10 ms).");
-        ImGui::Spacing();
 
+        ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();
 
         if (ImGui::Button("Reset to Defaults")) {
-            m_settings.keyDelayMs   = 15;
-            m_settings.enterDelayMs = 300;
-            m_settings.tabDelayMs   = 25;
-            m_settings.clearDelayMs = 3;
-            m_settings.keyHoldMs    = 10;
+            m_settings.keyDelayMs         = 15;
+            m_settings.enterDelayMs       = 300;
+            m_settings.tabDelayMs         = 25;
+            m_settings.clearDelayMs       = 3;
+            m_settings.keyHoldMs          = 10;
+            m_settings.inputMethod        = InputMethod::PostMessage;
+            m_settings.sequence           = LoginSequence::IdTabPassword;
+            m_settings.clearIdField       = true;
+            m_settings.pressEnter         = true;
+            m_settings.requireLoginScreen = true;
             SaveSettings();
-            FlashStatus("Timing delays reset to defaults", c.green);
+            FlashStatus("Advanced settings reset to defaults", c.green);
         }
         ImGui::SameLine();
         float closeW = ImGui::CalcTextSize("Save & Close").x + ImGui::GetStyle().FramePadding.x * 2.0f;
@@ -978,7 +1165,7 @@ void App::RenderAdvancedSettingsModal() {
             SaveSettings();
             m_advancedSettingsOpen = false;
             ImGui::CloseCurrentPopup();
-            FlashStatus("Advanced timing settings saved", c.green);
+            FlashStatus("Advanced settings saved", c.green);
         }
 
         ImGui::EndPopup();
