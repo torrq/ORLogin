@@ -857,7 +857,7 @@ void App::RenderClientsPanel() {
         ImVec4 dotColor = c.red;
         std::string status = ClientStateText(cl.state);
         if (cl.state == ClientState::AtLogin) {
-            dotColor = c.green;
+            dotColor = c.amber;
             if (cl.loginFocus == LoginFieldFocus::UserId) {
                 status = "At Login (User ID)";
             } else if (cl.loginFocus == LoginFieldFocus::Password) {
@@ -866,10 +866,12 @@ void App::RenderClientsPanel() {
                 status = "At Login";
             }
         } else if (cl.state == ClientState::InGame) {
-            dotColor = c.amber;
+            dotColor = c.green;
             if (!cl.charName.empty()) {
-                status = "In game: " + cl.charName;
+                status = "Logged in: " + cl.charName;
                 if (!cl.map.empty()) status += " @ " + cl.map;
+            } else {
+                status = "Logged in";
             }
         }
 
@@ -878,6 +880,10 @@ void App::RenderClientsPanel() {
         ImGui::Text("PID %lu%s", (unsigned long)cl.pid, focused ? " [Focused]" : "");
         ImGui::SameLine();
         ImGui::TextColored(dotColor, "%s", status.c_str());
+        if (ImGui::IsItemHovered() && cl.state == ClientState::InGame) {
+            ImGui::SetTooltip("Character: %s\nSlot: %u\nMap: %s",
+                              cl.charName.c_str(), (unsigned int)cl.charSlot, cl.map.c_str());
+        }
     }
 
     if (m_panelFont) ImGui::PopFont();

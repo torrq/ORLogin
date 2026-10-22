@@ -30,6 +30,7 @@ struct ClientInfo {
     LoginFieldFocus loginFocus = LoginFieldFocus::Unknown;
     std::string     charName;
     std::string     map;
+    uint8_t         charSlot   = 0;
 };
 
 const char* ClientStateText(ClientState s);
@@ -47,7 +48,7 @@ public:
     const ServerProfile& Profile() const { return m_profile; }
 
 private:
-    ClientState ReadState(ProcessReader& r, std::string& name, std::string& map, LoginFieldFocus& outFocus) const;
+    ClientState ReadState(ProcessReader& r, std::string& name, std::string& map, uint8_t& outSlot, LoginFieldFocus& outFocus) const;
     static HWND FindMainWindow(DWORD pid);
 
     const ServerProfile& m_profile;

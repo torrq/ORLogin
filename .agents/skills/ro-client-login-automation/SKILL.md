@@ -16,18 +16,20 @@ This skill provides domain knowledge, memory structures, reverse-engineering dis
 - `NameAddress` (`0x010DF5D8`) and `MapAddress` (`0x010D856C`) retain the previous session's character name and map string indefinitely while sitting at the login screen.
 - Checking `strlen(name) > 0` alone will cause false positives (reporting the client is in-game when it is actually at the login screen).
 
-### 1.2 The "OnlineAddress" Pointer Misconception
-- Legacy tools (e.g. early ORTools) treated address `0x010A2FB0` as a boolean flag (`loginValue > 0`).
-- **Discovery**: In 2018-06-21 clients, `0x010A2FB0` is a persistent heap pointer (e.g. `0x1E980BA0` / `513280928`) initialized immediately upon client launch. Testing `0x010A2FB0 > 0` evaluates to `true` 100% of the time, even on a freshly started client that has never logged in.
+### 1.2 The "OnlineAddress" Pointer & State Verification
+- In OSRO Highrate, `OnlineAddress` (`0x010A2FB0`) is the primary indicator used by ORTools (`loginValue > 0`).
+- Differential analysis against raw memory snapshots (`snap_pass.bin`, `snap_user1.bin`) confirms that at the login screen, `0x010A2FB0 == 0`. When in-game, it points to the active session heap structure (`> 0`).
+- `CharacterSlotAddress` (`0x010DF5F6`) is located at offset `+0x1E` from `NameAddress` (`0x010DF5D8`), containing the 0-indexed byte of the active character slot.
+- `InGameAddress` (`0x010DCCBC`) can drop to 0 in certain instanced maps (e.g. `prt_q`). Therefore, checking `onlineAddress > 0` (or `inGame == 1 || mode == 2`) provides robust, leak-proof detection.
 
 ### 1.3 Verified Client State Matrix
 To reliably distinguish whether a client is at the **Login Screen**, **Character Selection**, or **In-Game World**, inspect the following verified virtual addresses:
 
-| Client State | `ModeAddress` (`0x0107AA84`) | `InGameAddress` (`0x010DCCBC`) | `PlayerLoaded` (`0x010DFAEC`) | `UiFlag` (`0x00F33F90`) | Description |
+| Client State | `OnlineAddress` (`0x010A2FB0`) | `PlayerLoaded` (`0x010DFAEC`) | `ModeAddress` (`0x0107AA84`) | `InGameAddress` (`0x010DCCBC`) | Description |
 |---|:---:|:---:|:---:|:---:|---|
 | **Login Screen** | `0` | `0` | `0` | `0` | Client is waiting at username/password prompt. Safe to type credentials. |
-| **Character Select** | `0` | `0` | `0` | `1` | Account session authenticated; viewing character slots. |
-| **In-Game World** | `2` | `1` | `1` | `1` | Player character entity is spawned into the map. Automation should block login typing. |
+| **Character Select** | `0` | `0` | `0` | `0` | Account session authenticated; viewing character slots. |
+| **In-Game World** | `> 0` | `1` | `!= 0` | `1` (or `0` in `prt_q`) | Player character entity is spawned into the map. Automation should block login typing. |
 
 ```cpp
 bool IsClientAtLoginScreen(uint32_t mode, uint32_t inGame) {

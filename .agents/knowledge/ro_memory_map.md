@@ -10,11 +10,11 @@
 
 | Property | Virtual Address | Type | Verified Behavior |
 |---|---|---|---|
-| `InGameAddress` | `0x010DCCBC` | uint32 | **`1`** when active inside the game world. **`0`** when logged out / at login screen / at character selection. |
-| `ModeAddress` | `0x0107AA84` | uint32 | **`2`** when in Game Mode (`CGameMode`). **`0`** when at Login Screen or Character Selection. |
+| `OnlineAddress` | `0x010A2FB0` | uint32 | **Primary ORTools Online Indicator**: **`> 0`** when character is logged in world. **`0`** when sitting at login screen. |
+| `InGameAddress` | `0x010DCCBC` | uint32 | Fallback in-game world indicator. Can be 0 in certain instanced maps (e.g. queue/arena `prt_q`). |
+| `ModeAddress` | `0x0107AA84` | uint32 | Client mode manager. 0 at login screen, non-zero in world/game. |
 | `LoginFocusAddress` | `0x0107A13C` | uint32 | **`5`** when User ID input field is focused. **`0`** when Password input field is focused. Corroborated with caret Y-pos (`106` vs `138`). |
-| `PlayerLoaded` | `0x010DFAEC` | uint32 | **`1`** when player character entity is spawned into the world. **`0`** when logged out. |
-| `NameAddress` | `0x010DF5D8` | char[24] | Character name in ANSI (CP-1252). Note: The game client does **not** zero this out when logging out to login screen; check `InGameAddress == 1` first. |
-| `MapAddress` | `0x010D856C` | char[16] | Current map name (e.g. `prontera`). Retains previous map until new game entry. |
-| `CharSlotAddress`| `0x010DF5F6` | uint8 | Currently selected character slot (0-indexed). |
-| `LegacyOnline` | `0x010A2FB0` | uint32 | **DO NOT USE for login state.** This is a static heap pointer (`0x1E980BA0`) that is `> 0` even at the login screen. |
+| `PlayerLoaded` | `0x010DFAEC` | uint32 | **`1`** when player character entity is spawned into the world. **`0`** at login screen. |
+| `NameAddress` | `0x010DF5D8` | char[24] | Character name in ANSI (CP-1252 / Western). |
+| `MapAddress` | `0x010D856C` | char[16] | Current map name (e.g. `prt_q`, `prontera`). |
+| `CharSlotAddress`| `0x010DF5F6` | uint8 | Currently selected character slot (0-indexed byte, offset `+0x1E` from `NameAddress`). |

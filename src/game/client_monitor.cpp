@@ -60,36 +60,47 @@ void ClientMonitor::Refresh() {
         ClientInfo info;
         info.pid  = pid;
         info.hwnd = FindMainWindow(pid);
-        info.state = reader->IsOpen() ? ReadState(*reader, info.charName, info.map, info.loginFocus) : ClientState::NoAccess;
+        info.state = reader->IsOpen() ? ReadState(*reader, info.charName, info.map, info.charSlot, info.loginFocus) : ClientState::NoAccess;
         if (info.state == ClientState::NoAccess) reader.reset(); // retry opening next refresh
         next.push_back(std::move(info));
     }
     m_clients = std::move(next);
 }
 
-// NOTE (login-screen detection): ORTools' HR rule only distinguishes in-game
-// (*(u32*)online > 0) from "not in-game", which covers the login screen AND the
-// server/character select screens. A dedicated login-screen signal still needs to be
-// discovered (see .agents/knowledge/domain/login_detection.md); until then AtLogin
-// means "not in-game", which is a safe precondition for typing credentials.
-ClientState ClientMonitor::ReadState(ProcessReader& r, std::string& name, std::string& map, LoginFieldFocus& outFocus) const {
+// In-game vs Login state detection based on ORTools memory architecture:
+// OnlineAddress (>0 when online in HR, ==3571961 in MR), supplemented by inGameAddress/modeAddress.
+ClientState ClientMonitor::ReadState(ProcessReader& r, std::string& name, std::string& map, uint8_t& outSlot, LoginFieldFocus& outFocus) const {
     uint32_t inGame = 0;
     uint32_t mode = 0;
-    if (!r.ReadU32(m_profile.inGameAddress, inGame) || !r.ReadU32(m_profile.modeAddress, mode)) {
+    uint32_t online = 0;
+
+    bool hasInGame = (m_profile.inGameAddress != 0) && r.ReadU32(m_profile.inGameAddress, inGame);
+    bool hasMode   = (m_profile.modeAddress != 0) && r.ReadU32(m_profile.modeAddress, mode);
+    bool hasOnline = (m_profile.onlineAddress != 0) && r.ReadU32(m_profile.onlineAddress, online);
+
+    if (!hasInGame && !hasMode && !hasOnline) {
         outFocus = LoginFieldFocus::Unknown;
+        outSlot  = 0;
         return ClientState::NoAccess;
     }
 
-    // InGame if character entity is active in world (inGame == 1) or mode == 2 (CGameMode)
-    if (inGame == 1 || mode == 2) {
+    // InGame if ORTools online pointer is active (>0), or character entity is active (inGame == 1 || mode == 2)
+    bool isOnline = (hasOnline && online > 0) || (hasInGame && inGame == 1) || (hasMode && mode == 2);
+
+    if (isOnline) {
         name = r.ReadString(m_profile.nameAddress, 24);
         map  = r.ReadString(m_profile.mapAddress, 16);
+        outSlot = 0;
+        if (m_profile.charSlotAddress != 0) {
+            r.Read(m_profile.charSlotAddress, &outSlot, sizeof(outSlot));
+        }
         outFocus = LoginFieldFocus::Unknown;
         return ClientState::InGame;
     }
 
     name.clear();
     map.clear();
+    outSlot = 0;
 
     outFocus = LoginFieldFocus::Unknown;
     if (m_profile.loginFocusAddress != 0) {
