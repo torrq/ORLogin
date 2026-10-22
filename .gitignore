@@ -1,0 +1,66 @@
+# ==============================================================================
+# Git Ignore Configuration - ORLogin Project
+# ==============================================================================
+
+# --- CMake & C++ Build Outputs ---
+build/
+bin/
+out/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake.in
+*.ninja
+.ninja_*
+
+# MSVC / Visual Studio artifacts
+.vs/
+*.vcxproj.user
+*.vcxproj.userosv
+*.sln.docstates
+*.suo
+*.user
+*.idb
+*.pdb
+*.ilk
+*.obj
+*.lib
+*.exp
+*.pch
+*.ipch
+*.tlog
+*.log
+
+# Compiled Binary Outputs
+*.exe
+*.dll
+*.so
+*.dylib
+
+# --- Environment & Sensitive Data ---
+.env
+.env.local
+.env.*.local
+*.vault
+*.vault.*
+*.settings.json
+login_events.json
+debug_client.txt
+
+# --- IDE & Editor Settings ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Operating System Artifacts ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+
+# --- Temporary Files ---
+*.tmp
+*.bak

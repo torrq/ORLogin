@@ -1,0 +1,111 @@
+---
+name: ro-client-login-automation
+description: Domain knowledge, reverse-engineered memory structures, login screen detection algorithms, input injection mechanics, and secure credential handling for Ragnarok Online (RO/OSRO) automation tools.
+---
+
+# Ragnarok Online (RO) Client Memory & Login Automation Skill
+
+This skill provides domain knowledge, memory structures, reverse-engineering discoveries, Win32 window message injection techniques, and security standards for building automation and login assistance tools for Ragnarok Online (specifically OSRO Highrate / 2018-06-21 Ragexe clients).
+
+---
+
+## 1. RO Client Memory Architecture & State Detection
+
+### 1.1 The Login State Trap: Un-Zeroed Memory Buffers
+- **Critical Discovery**: When a player logs out or disconnects from the game world back to Character Selection or the Login Screen, the RO game client (`OSRO.exe` / `Ragexe`) **does not zero out** the active character buffer or map buffer.
+- `NameAddress` (`0x010DF5D8`) and `MapAddress` (`0x010D856C`) retain the previous session's character name and map string indefinitely while sitting at the login screen.
+- Checking `strlen(name) > 0` alone will cause false positives (reporting the client is in-game when it is actually at the login screen).
+
+### 1.2 The "OnlineAddress" Pointer Misconception
+- Legacy tools (e.g. early ORTools) treated address `0x010A2FB0` as a boolean flag (`loginValue > 0`).
+- **Discovery**: In 2018-06-21 clients, `0x010A2FB0` is a persistent heap pointer (e.g. `0x1E980BA0` / `513280928`) initialized immediately upon client launch. Testing `0x010A2FB0 > 0` evaluates to `true` 100% of the time, even on a freshly started client that has never logged in.
+
+### 1.3 Verified Client State Matrix
+To reliably distinguish whether a client is at the **Login Screen**, **Character Selection**, or **In-Game World**, inspect the following verified virtual addresses:
+
+| Client State | `ModeAddress` (`0x0107AA84`) | `InGameAddress` (`0x010DCCBC`) | `PlayerLoaded` (`0x010DFAEC`) | `UiFlag` (`0x00F33F90`) | Description |
+|---|:---:|:---:|:---:|:---:|---|
+| **Login Screen** | `0` | `0` | `0` | `0` | Client is waiting at username/password prompt. Safe to type credentials. |
+| **Character Select** | `0` | `0` | `0` | `1` | Account session authenticated; viewing character slots. |
+| **In-Game World** | `2` | `1` | `1` | `1` | Player character entity is spawned into the map. Automation should block login typing. |
+
+```cpp
+bool IsClientAtLoginScreen(uint32_t mode, uint32_t inGame) {
+    // Mode 0 = CLoginMode / CSelectMode, inGame 0 = no active world entity
+    return (mode == 0 && inGame == 0);
+}
+
+bool IsClientInGame(uint32_t mode, uint32_t inGame) {
+    // Mode 2 = CGameMode, inGame 1 = world character active
+    return (mode == 2 || inGame == 1);
+}
+```
+
+---
+
+## 2. Window Enumeration & Viewport Discovery
+
+### 2.1 Direct3D Wrapper & Window Visibility Quirks
+- Standard `FindWindow` or `EnumWindows` filtering on `IsWindowVisible(hwnd)` or `GetWindow(hwnd, GW_OWNER) == NULL` frequently fails on RO clients utilizing borderless window hooks, ddraw wrappers, or DirectX overlays (e.g. dgvoodoo, ddraw.dll).
+- The client window may be an owned child or have non-standard extended styles (`WS_EX_LAYERED`, `WS_EX_TOOLWINDOW`).
+
+### 2.2 Robust Viewport Matching Algorithm
+Enumerate all windows associated with the target process ID, testing solely for window validity and client dimension thresholds:
+```cpp
+HWND FindGameWindow(DWORD targetPid) {
+    HWND found = nullptr;
+    EnumWindows([](HWND h, LPARAM lp) -> BOOL {
+        DWORD wpid = 0;
+        GetWindowThreadProcessId(h, &wpid);
+        auto* outHwnd = reinterpret_cast<HWND*>(lp);
+        if (wpid == targetPid && IsWindow(h)) {
+            RECT rc{};
+            if (GetClientRect(h, &rc)) {
+                int width  = rc.right - rc.left;
+                int height = rc.bottom - rc.top;
+                // RO game viewports are at least 640x480; threshold > 200 filters out dummy helper windows
+                if (width > 200 && height > 200) {
+                    *outHwnd = h;
+                    return FALSE; // Found primary viewport
+                }
+            }
+        }
+        return TRUE;
+    }, reinterpret_cast<LPARAM>(&found));
+    return found;
+}
+```
+
+---
+
+## 3. Keystroke & Credential Input Injection
+
+### 3.1 PostMessage vs SendInput
+- **`PostMessageW` (Recommended)**: Direct message delivery to the client's window message queue (`WM_KEYDOWN`, `WM_KEYUP`, `WM_CHAR`).
+  - Does **not** require the game window to be the active foreground window.
+  - Generates proper `lParam` bitfields containing virtual scan codes (`MapVirtualKeyW(vk, MAPVK_VK_TO_VSC)`).
+  - Gepard Shield anti-cheat handles `PostMessageW` without driver-level hook interception when sent with realistic scan codes.
+- **`SendInput`**: Injects hardware-level scancodes into the OS event stream.
+  - Requires `SetForegroundWindow(hwnd)`.
+  - Must ensure any user-held modifier keys (e.g. `Ctrl`, `Shift` from the trigger hotkey) are released before dispatching characters, otherwise `Ctrl + char` shortcuts may fire inside the game.
+
+### 3.2 Login Form Field Reset
+When typing into the RO login form:
+1. Tap `VK_END` to place the caret at the end of the ID field.
+2. Send 24 consecutive `VK_BACK` taps (RO account usernames have a hard cap of 24 characters).
+3. Type username string $\rightarrow$ Tap `VK_TAB` $\rightarrow$ Type password string $\rightarrow$ Tap `VK_RETURN`.
+
+---
+
+## 4. Security Standards for In-Memory Credentials
+
+1. **Non-Pageable Memory**:
+   - Store master keys and decrypted passwords only in memory pages locked with `VirtualLock` to prevent swapping to `pagefile.sys`.
+2. **Zero Plaintext on Disk**:
+   - Encrypt configuration vaults using authenticated ciphers (AES-256-GCM) with key derivation via PBKDF2-HMAC-SHA256 (600,000+ iterations).
+3. **DPAPI RAM Protection**:
+   - Keep in-memory strings protected via `CryptProtectMemory(..., CRYPTPROTECTMEMORY_SAME_PROCESS)`. Unprotect only for the immediate microsecond duration needed to transmit the string.
+4. **Immediate Zeroing**:
+   - Use `SecureZeroMemory` on all buffers, edit fields, and Dear ImGui internal text edit states (`ImGuiInputTextState`) immediately upon submission or form closure.
+5. **Session Lock Purging**:
+   - Hook `WM_WTSSESSION_CHANGE` (`WTS_SESSION_LOCK`). Instantly wipe keys and lock vaults when the user locks Windows (`Win + L`).
