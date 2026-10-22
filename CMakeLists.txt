@@ -64,13 +64,4 @@ if(MSVC)
 endif()
 set_target_properties(ORLogin PROPERTIES OUTPUT_NAME "ORLogin")
 
-# Diagnostic Memory Probe Tool (Requires Admin)
-add_executable(probe tools/probe.cpp ORLogin.manifest)
-target_compile_definitions(probe PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
-target_link_libraries(probe PRIVATE user32 shell32)
-if(MSVC)
-    target_compile_options(probe PRIVATE /W3 /utf-8)
-    target_link_options(probe PRIVATE /MANIFESTUAC:NO)
-endif()
-set_target_properties(probe PROPERTIES OUTPUT_NAME "probe")
 
