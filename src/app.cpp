@@ -936,7 +936,7 @@ void App::RenderAdvancedSettingsModal() {
         ImGui::Text("Double-Enter Pause");
         ImGui::SetNextItemWidth(-1);
         if (ImGui::SliderInt("##adv_enter_delay", &m_settings.enterDelayMs, 20, 1000, "%d ms")) SaveSettings();
-        ImGui::TextColored(c.muted, "Pause between 1st Return (submit credentials) and 2nd Return (select server). Default: 200 ms.");
+        ImGui::TextColored(c.muted, "Pause between 1st Return (submit credentials) and 2nd Return (select service). Default: 350 ms.");
         ImGui::Spacing();
 
         ImGui::Text("Tab Switch Delay");
@@ -962,7 +962,7 @@ void App::RenderAdvancedSettingsModal() {
 
         if (ImGui::Button("Reset to Defaults")) {
             m_settings.keyDelayMs   = 15;
-            m_settings.enterDelayMs = 200;
+            m_settings.enterDelayMs = 350;
             m_settings.tabDelayMs   = 25;
             m_settings.clearDelayMs = 3;
             m_settings.keyHoldMs    = 10;
