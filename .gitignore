@@ -2,6 +2,9 @@
 # Git Ignore Configuration - ORLogin Project
 # ==============================================================================
 
+# --- Rust / Cargo Build Outputs ---
+/target/
+
 # --- CMake & C++ Build Outputs ---
 build/
 bin/

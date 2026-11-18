@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Dark obsidian squircle tile matching TruePeaks visual family -->
+  <rect x="24" y="24" width="464" height="464" rx="110" ry="110" fill="#0F1319" stroke="#3F4552" stroke-width="10"/>
+
+  <!-- Brushed ice-white padlock shackle -->
+  <path d="M 186 244 V 164 A 70 70 0 0 1 326 164 V 244" fill="none" stroke="#E6F7FF" stroke-width="34" stroke-linecap="round"/>
+
+  <!-- Two-tone vault body: sky-cyan top cap (#5EC4FE) + royal-blue body (#3189FE) -->
+  <rect x="128" y="218" width="256" height="198" rx="42" ry="42" fill="#5EC4FE"/>
+  <path d="M 128 268 H 384 V 374 C 384 397.2 365.2 416 342 416 H 170 C 146.8 416 128 397.2 128 374 Z" fill="#3189FE"/>
+
+  <!-- Keyhole cutout (#0F1319) with subtle cyan vault ring -->
+  <circle cx="256" cy="322" r="30" fill="#0F1319"/>
+  <rect x="242" y="330" width="28" height="54" rx="14" ry="14" fill="#0F1319"/>
+</svg>

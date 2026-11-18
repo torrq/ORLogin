@@ -47,9 +47,9 @@ A secure, high-performance login helper for **Oldschool Ragnarok Online (OSRO)**
   - Configurable idle auto-lock timer.
   - Optional window display protection (`WDA_EXCLUDEFROMCAPTURE`) to prevent screen capture / streaming leaks on OBS and Discord (disabled by default).
   - Progressive rate-limiting delay on failed master password attempts.
-- **Cascading Zero-Dependency Rendering**:
-  - 3-tier graphics fallback: Direct3D 11 Hardware $\rightarrow$ Direct3D 11 WARP Software Rasterizer $\rightarrow$ Direct3D 9 legacy fallback.
-  - Standalone, statically linked (`/MT`) native C++17 binary (~940 KB). Zero webview, Node, or runtime dependencies.
+- **Pure-Rust Native Desktop UI (`eframe` / `egui`)**:
+  - Built in Rust with `eframe` + `egui` (`glow` GPU rendering) and statically linked CRT (`+crt-static`). Zero webview, Node, or external DLL runtime dependencies.
+  - Legacy C++17 / Dear ImGui source is archived under [`legacy/`](legacy/).
 
 ---
 
@@ -63,42 +63,40 @@ ORLogin supports both standard installed usage and fully portable USB drive exec
 - **Security Advantage**: Vault files reside in your personal Windows user profile, preventing unprivileged users or shared folder guests from accessing the encrypted vault.
 
 ### 2. Portable Mode
-- **Vault & Settings Path**: The same folder as `ORLogin.exe`.
+- **Vault & Settings Path**: The same folder as `orlogin.exe`.
 - **How to Activate at Runtime**:
-  Simply create an empty file named `portable.flag` in the same directory as `ORLogin.exe`.
+  Simply create an empty file named `portable.flag` in the same directory as `orlogin.exe`.
   When detected, ORLogin reads and writes `ORLogin.vault` and `ORLogin.settings.json` strictly in the executable folder. The bottom status bar will display `[Portable]` to confirm portable mode is active.
 - **How to Build Portable by Default**:
-  Pass `-DORLOGIN_PORTABLE=ON` during CMake configuration.
+  Compile with `--features portable`.
 
 ---
 
 ## Requirements
 
-- **Operating System**: Windows 7 SP1, 8, 8.1, 10, or 11 (x64).
-- **Privileges**: Run as **Administrator** (required to read memory and send window messages to elevated game clients; enforced via application manifest).
+- **Operating System**: Windows 7 SP1, 8, 8.1, 10, or 11 (x64) with OpenGL 2.0+ GPU drivers.
+- **Privileges**: Run as **Administrator** (required to read memory and send window messages to elevated game clients; enforced via embedded application manifest).
+- **Toolchain (to build from source)**: Rust (`x86_64-pc-windows-msvc` toolchain) + MSVC linker.
 
 ---
 
 ## Building from Source
 
 ### Standard Build
-1. Open PowerShell or Command Prompt in the repository root.
-2. Run `build.bat`:
-   ```cmd
-   .\build.bat
-   ```
-   Or via CMake directly:
-   ```cmd
-   cmake -B build -DCMAKE_BUILD_TYPE=Release
-   cmake --build build --config Release
-   ```
-3. The compiled binary will be placed at `build\Release\ORLogin.exe`.
+```cmd
+cargo build --release
+```
+The compiled binary will be placed at `target\release\orlogin.exe`.
 
 ### Portable Release Build
 To compile a binary that defaults to portable mode without requiring `portable.flag`:
 ```cmd
-cmake -B build -DORLOGIN_PORTABLE=ON -DCMAKE_BUILD_TYPE=Release
-cmake --build build --config Release
+cargo build --release --features portable
+```
+
+### Unit Tests
+```cmd
+cargo test
 ```
 
 ---
