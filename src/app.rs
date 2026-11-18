@@ -1,4 +1,4 @@
-use crate::config::{self, InputMethod, LoginSequence, Settings};
+use crate::config::{self, InputMethod, LoginSequence, Settings, SortColumn};
 use crate::game::addresses::HIGH_RATE;
 use crate::game::monitor::{ClientInfo, ClientMonitor, ClientState, LoginFieldFocus};
 use crate::input::typer::{Typer, TyperJob};
@@ -18,12 +18,7 @@ use std::time::{Duration, Instant};
 use zeroize::Zeroize;
 
 const VERSION_LABEL: &str = "v6";
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SortColumn {
-    Label,
-    Username,
-}
+const GITHUB_URL: &str = "https://github.com/torrq/ORLogin";
 
 struct StatusMessage {
     text: String,
@@ -62,13 +57,10 @@ pub struct ORLoginApp {
     // Inline delete confirmation
     confirm_delete_index: Option<usize>,
 
-    // Table sorting
-    sort_col: SortColumn,
-    sort_asc: bool,
-
     // Modals
     change_master_open: bool,
     advanced_settings_open: bool,
+    about_open: bool,
 
     // Hotkey capture state
     capturing_hotkey: bool,
@@ -142,10 +134,9 @@ impl ORLoginApp {
             acc_pw_buf: String::new(),
             show_acc_pw: false,
             confirm_delete_index: None,
-            sort_col: SortColumn::Label,
-            sort_asc: true,
             change_master_open: false,
             advanced_settings_open: false,
+            about_open: false,
             capturing_hotkey: false,
             hotkey_registered: false,
             icons: SvgIconCache::default(),
@@ -416,12 +407,22 @@ impl ORLoginApp {
 
     fn render_header(&mut self, ui: &mut egui::Ui, pal: ThemePalette) {
         ui.horizontal(|ui| {
-            ui.label(
-                RichText::new("OSRO Login Helper")
-                    .color(pal.accent)
-                    .size(16.0)
-                    .strong(),
-            );
+            let title_resp = ui
+                .add(
+                    egui::Label::new(
+                        RichText::new("OSRO Login Helper")
+                            .color(pal.accent)
+                            .size(16.0)
+                            .strong(),
+                    )
+                    .selectable(false)
+                    .sense(egui::Sense::click()),
+                )
+                .on_hover_cursor(egui::CursorIcon::PointingHand)
+                .on_hover_text("About ORLogin");
+            if title_resp.clicked() {
+                self.about_open = true;
+            }
             ui.label(RichText::new(VERSION_LABEL).color(pal.muted));
 
             // Server badge
@@ -754,8 +755,8 @@ impl ORLoginApp {
         // Compute display order sorted case-insensitively
         let mut display_order: Vec<usize> = (0..count).collect();
         let accounts = self.vault.accounts();
-        let sort_col = self.sort_col;
-        let sort_asc = self.sort_asc;
+        let sort_col = self.settings.sort_column;
+        let sort_asc = self.settings.sort_ascending;
         display_order.sort_by(|&a_idx, &b_idx| {
             let a = &accounts[a_idx];
             let b = &accounts[b_idx];
@@ -776,6 +777,7 @@ impl ORLoginApp {
         let mut trigger_send: Option<i32> = None;
         let mut trigger_edit: Option<usize> = None;
         let mut trigger_delete_confirm: Option<usize> = None;
+        let mut sort_changed = false;
 
         let active_idx = self.vault.active_index();
         let edit_blue = if pal.dark { pal.accent } else { pal.primary };
@@ -835,7 +837,7 @@ impl ORLoginApp {
                 .max_rect(hdr_cols[0])
                 .layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight)),
             |ui| {
-                ui.label(RichText::new("Active").strong());
+                ui.add(egui::Label::new(RichText::new("Active").strong()).selectable(false));
             },
         );
 
@@ -857,9 +859,9 @@ impl ORLoginApp {
                     .rect_filled(hit_rect, Rounding::same(3.0), pal.panel_hover);
                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
             }
-            let active = self.sort_col == col;
+            let active = self.settings.sort_column == col;
             let arrow = if active {
-                if self.sort_asc { "  \u{25B2}" } else { "  \u{25BC}" }
+                if self.settings.sort_ascending { "  \u{25B2}" } else { "  \u{25BC}" }
             } else {
                 ""
             };
@@ -873,20 +875,25 @@ impl ORLoginApp {
                     .max_rect(col_rect)
                     .layout(egui::Layout::left_to_right(egui::Align::Center)),
                 |ui| {
-                    ui.label(
-                        RichText::new(format!("{title}{arrow}"))
-                            .color(text_col)
-                            .strong(),
-                    );
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(format!("{title}{arrow}"))
+                                .color(text_col)
+                                .strong(),
+                        )
+                        .selectable(false),
+                    )
+                    .on_hover_cursor(egui::CursorIcon::PointingHand);
                 },
             );
             if resp.clicked() {
-                if self.sort_col == col {
-                    self.sort_asc = !self.sort_asc;
+                if self.settings.sort_column == col {
+                    self.settings.sort_ascending = !self.settings.sort_ascending;
                 } else {
-                    self.sort_col = col;
-                    self.sort_asc = true;
+                    self.settings.sort_column = col;
+                    self.settings.sort_ascending = true;
                 }
+                sort_changed = true;
             }
         }
 
@@ -895,7 +902,7 @@ impl ORLoginApp {
                 .max_rect(hdr_cols[3])
                 .layout(egui::Layout::left_to_right(egui::Align::Center)),
             |ui| {
-                ui.label(RichText::new("Actions").strong());
+                ui.add(egui::Label::new(RichText::new("Actions").strong()).selectable(false));
             },
         );
 
@@ -1085,6 +1092,9 @@ impl ORLoginApp {
                 }
             });
 
+        if sort_changed {
+            self.save_settings();
+        }
         if let Some(idx) = new_active {
             self.vault.set_active_index(idx);
             let _ = self.vault.save();
@@ -1255,7 +1265,11 @@ impl ORLoginApp {
         let esc = ctx.input(|i| i.key_pressed(egui::Key::Escape));
 
         let mut backdrop_clicked = false;
-        if self.account_form_open || self.change_master_open || self.advanced_settings_open {
+        if self.account_form_open
+            || self.change_master_open
+            || self.advanced_settings_open
+            || self.about_open
+        {
             egui::Area::new(egui::Id::new("modal_backdrop"))
                 .fixed_pos(egui::Pos2::ZERO)
                 .order(egui::Order::Middle)
@@ -1278,6 +1292,7 @@ impl ORLoginApp {
             self.account_form_open = false;
             self.change_master_open = false;
             self.advanced_settings_open = false;
+            self.about_open = false;
             return;
         }
 
@@ -1774,6 +1789,65 @@ impl ORLoginApp {
                 } else if changed {
                     self.save_settings();
                 }
+            }
+        }
+
+        // 4. About Modal
+        if self.about_open {
+            let mut open = self.about_open;
+            let mut close_clicked = false;
+            let win_resp = egui::Window::new("About ORLogin")
+                .open(&mut open)
+                .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
+                .fixed_size(Vec2::new(410.0, 0.0))
+                .collapsible(false)
+                .resizable(false)
+                .order(egui::Order::Foreground)
+                .show(ctx, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.label(
+                            RichText::new(format!("OSRO Login Helper {VERSION_LABEL}"))
+                                .color(pal.accent)
+                                .size(16.0)
+                                .strong(),
+                        );
+                        ui.add_space(4.0);
+                        ui.label(
+                            RichText::new(
+                                "An encrypted local account vault and fast login helper for Oldschool Ragnarok Online (OSRO).",
+                            )
+                            .color(pal.text),
+                        );
+                    });
+                    ui.add_space(6.0);
+                    ui.separator();
+                    ui.add_space(4.0);
+                    ui.label(
+                        RichText::new(
+                            "Stores your accounts encrypted on your PC, lets you log in with one click or a global hotkey, and automatically blocks typing while you are in-game so credentials never leak into chat.",
+                        )
+                        .color(pal.muted),
+                    );
+                    ui.add_space(8.0);
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Project Page:").strong());
+                        ui.hyperlink_to(GITHUB_URL, GITHUB_URL)
+                            .on_hover_cursor(egui::CursorIcon::PointingHand);
+                    });
+                    ui.add_space(10.0);
+                    ui.vertical_centered(|ui| {
+                        if ui
+                            .add_sized([88.0, 28.0], egui::Button::new("Close"))
+                            .on_hover_cursor(egui::CursorIcon::PointingHand)
+                            .clicked()
+                        {
+                            close_clicked = true;
+                        }
+                    });
+                });
+            apply_window_close_hand_cursor(ctx, win_resp.as_ref().map(|ir| &ir.response));
+            if !open || close_clicked {
+                self.about_open = false;
             }
         }
     }

@@ -23,6 +23,12 @@ pub enum InputMethod {
     SendInput = 1,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SortColumn {
+    Label,
+    Username,
+}
+
 /// Security-critical settings stored encrypted and authenticated inside the Vault payload (v2).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VaultSettings {
@@ -76,6 +82,8 @@ pub struct Settings {
     pub hotkey_vk: u32,
     pub hotkey_mods: u32,
     pub hide_from_capture: bool,
+    pub sort_column: SortColumn,
+    pub sort_ascending: bool,
 
     // Security-critical preferences (synchronized with encrypted vault payload v2)
     pub sequence: LoginSequence,
@@ -99,6 +107,8 @@ impl Default for Settings {
             hotkey_vk: 'L' as u32,
             hotkey_mods: MOD_CONTROL | MOD_SHIFT,
             hide_from_capture: false,
+            sort_column: SortColumn::Label,
+            sort_ascending: true,
             sequence: vs.sequence,
             clear_id_field: vs.clear_id_field,
             press_enter: vs.press_enter,
@@ -156,6 +166,10 @@ struct PlainSettingsJson {
     hotkey_mods: u32,
     #[serde(rename = "hideFromCapture", default)]
     hide_from_capture: bool,
+    #[serde(rename = "sortColumn", default = "default_sort_column_str")]
+    sort_column: String,
+    #[serde(rename = "sortAscending", default = "default_sort_ascending")]
+    sort_ascending: bool,
 }
 
 fn default_theme_str() -> String {
@@ -168,6 +182,14 @@ fn default_hotkey_vk() -> u32 {
 
 fn default_hotkey_mods() -> u32 {
     MOD_CONTROL | MOD_SHIFT
+}
+
+fn default_sort_column_str() -> String {
+    "label".to_owned()
+}
+
+fn default_sort_ascending() -> bool {
+    true
 }
 
 pub fn load_settings(path: &Path) -> Settings {
@@ -187,6 +209,12 @@ pub fn load_settings(path: &Path) -> Settings {
         parsed.hotkey_vk
     };
     s.hide_from_capture = parsed.hide_from_capture;
+    s.sort_column = if parsed.sort_column.eq_ignore_ascii_case("username") {
+        SortColumn::Username
+    } else {
+        SortColumn::Label
+    };
+    s.sort_ascending = parsed.sort_ascending;
     s
 }
 
@@ -196,6 +224,12 @@ pub fn save_settings(path: &Path, s: &Settings) -> std::io::Result<()> {
         hotkey_vk: s.hotkey_vk,
         hotkey_mods: s.hotkey_mods & MOD_MASK,
         hide_from_capture: s.hide_from_capture,
+        sort_column: match s.sort_column {
+            SortColumn::Label => "label",
+            SortColumn::Username => "username",
+        }
+        .to_owned(),
+        sort_ascending: s.sort_ascending,
     };
     let serialized = serde_json::to_string_pretty(&json_obj)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
@@ -218,6 +252,8 @@ mod tests {
         s.hotkey_vk = 0x74; // F5
         s.hotkey_mods = MOD_ALT | MOD_SHIFT;
         s.hide_from_capture = false;
+        s.sort_column = SortColumn::Username;
+        s.sort_ascending = false;
         // Tamper-sensitive fields should NOT be persisted in plain JSON.
         s.auto_lock_minutes = 0;
         save_settings(&path, &s).unwrap();
@@ -231,6 +267,8 @@ mod tests {
         assert_eq!(loaded.hotkey_vk, 0x74);
         assert_eq!(loaded.hotkey_mods, MOD_ALT | MOD_SHIFT);
         assert!(!loaded.hide_from_capture);
+        assert_eq!(loaded.sort_column, SortColumn::Username);
+        assert!(!loaded.sort_ascending);
         assert_eq!(loaded.auto_lock_minutes, 15);
 
         let _ = fs::remove_dir_all(&dir);
